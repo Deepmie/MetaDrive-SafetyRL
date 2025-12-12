@@ -1,0 +1,23 @@
+#! /bin/zsh
+
+case "$1" in 
+    train)
+        echo "start to train..."
+        CUDA_VISIBLE_DEVICES=1 python dp_single_version2/main.py
+    ;;
+    check_env)
+        echo "check env..."
+        python metadrive/custom2_version2/create_env.py
+    ;;
+    eval)
+        echo "evaluate policy from newest checkpoint..."
+        CUDA_VISIBLE_DEVICES=1 python dp_single_version2/eval.py --type newest
+    ;;
+    best_eval)
+        echo "evaluate best policy from checkpoint..."
+        CUDA_VISIBLE_DEVICES=1 python dp_single_version2/eval.py --type best
+    ;;
+    *)
+        echo "instruction error, must choose in [train, check_env, eval, best_eval], you give \`$1\`."
+    ;;
+esac

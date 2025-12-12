@@ -1,0 +1,299 @@
+import sys
+sys.path.append('/workspace/metadrive-github/metadrive')
+import numpy as np
+from torch import Tensor
+from numpy import ndarray
+import torch
+from torch.optim import Adam
+from torch.nn.functional import mse_loss
+from metadrive.custom2_version2.base_config import PPOConfig
+from metadrive.custom2_version2.policy import Policy
+from metadrive.custom2_version2.buffer import RolloutBuffer, RolloutBatchData
+from metadrive.custom2_version2.envs import ParallelEnv, SingleEnv
+from metadrive.custom2_version2.schedule import ConstantSchedule
+from metadrive.custom2_version2.utils import set_random_seed, converto_ndarray, converto_torch, Logger, Timer
+from metadrive.custom2_version2.create_env import create_env, create_render_config
+from metadrive.custom2_version2.type import ActionType, RenderClass
+from metadrive.custom2_version2.controller import Controller, EvalController
+from metadrive.utils.doc_utils import generate_gif
+from typing import Tuple, Dict, Union, Optional, List, cast
+from tqdm import tqdm
+from functools import partial
+from datetime import datetime
+import traceback
+import os
+
+class PPO:
+    def __init__(self, config: PPOConfig, eval_mode: bool = False):
+        set_random_seed(0) # 设置随机种子
+        self.config = config
+        self.now_datetime = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
+        self.final_evaluate_path = f'{self.config.evaluate_save_root}/demo_{self.now_datetime}.gif'
+
+        self.env: ParallelEnv = ParallelEnv(
+            [partial(create_env, config.metadriveenv_config) for _ in range(self.config.parallel_env_config.n_process)],
+            self.config.parallel_env_config,
+        )
+        self.env_eval: SingleEnv = SingleEnv(
+            partial(create_env, config.metadriveenv_config),
+            self.config.parallel_env_config,
+        )
+        
+        self.policy: Policy = Policy(self.config.policy_config)
+        self.buffer: RolloutBuffer = RolloutBuffer(self.config.buffer_config)
+        self._last_obss  = self.env.reset() # 初始化第一次的env
+        self.env_eval.reset()
+        
+        self.controller: Controller = Controller(self.env, self.config.controller_config)
+        self.controller_eval: EvalController = EvalController(self.env_eval, self.config.controller_config)
+        self.timer: Timer = Timer()
+        self.render_class: RenderClass = RenderClass()
+
+        if not eval_mode:
+            self._create_logger()
+        
+        self.schedule    = ConstantSchedule(self.config.epsilon)
+
+        # ======== 一些常量 ======== #
+        self._last_dones = np.array([True, ]) # 初始化第一次的done
+        self._remaining  = 1.0
+        self.num_steps   = 0.0
+        self._start_successful: Optional[bool] = None
+
+        # ====== 训练的初始化 ====== #
+        self.optimizer = Adam(self.policy.parameters(), lr=self.config.learning_rate)
+        # self.optimizer.load_state_dict(torch.load('/workspace/model_weight/optimizer.pth'))
+    
+    def start(self) -> Tuple[bool, str]:
+        _process_name_ = 'Sample & Train'
+        self.timer.start(_process_name_)
+        is_suc, info = self._start()
+        self.logger.write_time(self.timer.end(), _process_name_)
+        return is_suc, info
+    
+    def _start(self) -> Tuple[bool, str]:
+        try:
+            self.policy.train()
+            pbar = tqdm(total=self.config.total_steps, desc='total')
+            iterations = 0
+            evaluate_idx = 0
+            best_reward = -float('inf')
+            while self.num_steps < self.config.total_steps:
+                print('\nstart to sample...')
+                self._sample()
+                iterations += 1
+                self.num_steps = self.config.n_process * iterations * self.config.sample_steps
+                self._update_remaining(self.num_steps)
+                pbar.update(self.config.n_process * self.config.sample_steps)
+
+                print('\nstart to train...')
+                self._train()
+
+                if self.num_steps >= (evaluate_idx + 1) * self.config.evaluate_steps:
+                    print('\nstart to evaluate & save...')
+                    reward_eval = self._evaluate()
+                    self.logger.write_reward(reward_eval)
+                    evaluate_idx += 1
+                    self._save(ckp_pth=self.config.policy_checkpoint_pth)
+                    if reward_eval > best_reward: self._save(ckp_pth=self.config.best_policy_checkpoint_pth); best_reward = reward_eval
+            
+            self._start_successful = True
+            start_info = 'Successful!'
+        except Exception:
+            self._start_successful = False
+            start_info = traceback.format_exc()
+        finally:
+            if not self._start_successful:
+                self.close()
+        return self._start_successful, start_info
+    
+    def final_eval(self):
+        reward_eval = self._evaluate(True, self.final_evaluate_path)
+        print(f'episode_reward {reward_eval}')
+        print('gif generation is finished ...')
+    
+    def predict(self, obs: Union[ndarray, Tensor], state: Optional[ndarray] = None, deterministic: bool = False):
+        action, state = self.policy.predict(obs, state, deterministic)
+        return action, state
+    
+    def close(self):
+        self.env.close()
+        self.env_eval.close()
+        if hasattr(self, 'logger'): self.logger.close()
+
+    def load_weight_from_checkpoint(self, load_path: Optional[str] = None):
+        if load_path is None:
+            load_path = self.config.policy_checkpoint_pth
+        self.policy.load_state_dict(torch.load(f=load_path))
+        print(f'load weight from `{load_path}` successfully!')
+
+    def _sample(self):
+        pbar = tqdm(total=self.config.sample_steps, desc='sample')
+        # set_random_seed(0, True) # 对齐用
+
+        curr_step: int = 0
+        self.buffer.reset() # 采样前先清空buffer
+
+        while curr_step < self.config.sample_steps:
+            curr_step += 1
+            pbar.update(1)
+            
+            # 上层决策
+            actions, log_probs, values = self.policy.select_action(self._last_obss)
+            
+            # 底层控制
+            control_values, _ = self.controller.control(actions, self._last_dones)
+
+            obs_nexts, rewards, dones, step_infos = self.env.step(control_values)
+            rewards = self._bootstraping(rewards, dones, step_infos)
+            
+            # 存入buffer
+            self.buffer.push(self._last_obss, actions, rewards, self._last_dones, log_probs, values)
+            
+            self._last_obss = obs_nexts # update observation
+            self._last_dones = dones    # update done
+
+        with torch.no_grad():
+            values = self.policy.predict_value(converto_torch(obs_nexts))
+        dones = torch.from_numpy(dones).to(torch.long)
+        
+        self.buffer.compute_advantage(values, dones)
+        pbar.close()
+    
+    def _train(self):
+        total_sample_steps = self.config.sample_steps * self.config.n_process
+        pbar = tqdm(total=self.config.epoch * (total_sample_steps // self.config.batch_size + int(total_sample_steps % self.config.batch_size != 0)), desc='train')
+        clip_range = self._clip_range()
+        self.policy.to(self.config.device)
+        
+        # policy_loss_list: List = []
+        # value_loss_list: List = []
+        # loss_list: List = []
+
+        for epoch in range(self.config.epoch):
+            for rollout_data in self.buffer.get():
+                rollout_data.move_to_device(self.config.device)
+                actions = rollout_data.actions
+                
+                # 如果是离散动作, 展平
+                if self.config.distribution_config.action_space == ActionType.discrete:
+                    actions = actions.flatten()
+                
+                values, log_probs, entropys = self.policy.evaluate_action(rollout_data.obss, actions)
+                
+                # advantage批内归一化
+                advantages = rollout_data.advantages
+                advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
+
+                ratio = torch.exp(log_probs - rollout_data.old_log_probs)
+
+                policy_loss_1 = advantages * ratio
+                policy_loss_2 = advantages * torch.clamp(ratio, 1 - clip_range, 1 + clip_range)
+                policy_loss = -torch.min(policy_loss_1, policy_loss_2).mean()
+
+                value_loss = mse_loss(rollout_data.returns.flatten(), values.flatten())
+
+                entropy_loss = -torch.mean(entropys)
+
+                loss = policy_loss + self.config.entropy_coef * entropy_loss + self.config.value_loss_coef * value_loss
+
+                # early stop机制
+                if self._early_stop(log_probs, rollout_data.old_log_probs): break
+
+                self.optimizer.zero_grad()
+                loss.backward()
+                torch.nn.utils.clip_grad_norm_(self.policy.parameters(), self.config.max_grad_norm)
+                self.optimizer.step()
+                
+                # ===============extra info==================#
+                pbar.update(1)
+
+                # policy_loss_list.append(policy_loss.item())
+                # value_loss_list.append(value_loss.item())
+                # loss_list.append(loss.item())
+                # ===========================================#
+        
+        self.policy.to(torch.device(device='cpu'))
+        pbar.close()
+
+    def _evaluate(self, is_render: bool = False, evaluate_save_path: str = '') -> Tuple:
+        self.policy.eval()
+        obs = self.env_eval.reset()
+        last_done = np.ones(shape=[1, ])
+        total_reward = 0.0
+        if is_render: render_row_text = self._create_render_text()
+        
+        for _ in range(self.config.evaluate_total_steps):
+            action, _ = self.predict(obs, deterministic=True)
+            control_value, _ = self.controller_eval.control(action, last_done)
+            obs, reward, done, step_info = self.env_eval.step(control_value)
+            
+            total_reward += reward
+            if is_render: self.render_class.add_frame(self._render(render_row_text))
+            
+            if done:
+                break
+            
+            last_done = np.array([done], dtype=np.long)
+        
+        if is_render: self.render_class.generate_gif(evaluate_save_path)
+        return total_reward
+    
+    def _save(self, ckp_pth: str):
+        # 保存checkpoint
+        torch.save(self.policy.state_dict(), ckp_pth)
+
+    def _render(self, text: Dict) -> ndarray:
+        if 'step' in text: text['step'] = self.render_class.render_index
+        return self.env_eval.render(**create_render_config(text = text))
+    
+    def _create_render_text(self) -> Dict:
+        metadriveenv_config = self.config.metadriveenv_config
+        return dict(traffic_mode = metadriveenv_config.traffic_mode, step = None)
+
+    def _bootstraping(self, rewards: ndarray, dones: ndarray, step_infos: List[Dict]) -> ndarray:
+        '''
+        根据done和step_info的情况考虑是否修正reward, 如果是因为timelimit导致的done, 则考虑用value(obs)修正当前的reward
+        '''
+        for idx, done in enumerate(dones):
+            done = cast(ndarray, done)
+            if (
+                done.item() # 完成了(截断 or 成功)
+                and step_infos[idx].get('terminal_observation', None) is not None # (有终端观测值)
+                and step_infos[idx].get('TimeLimit.truncated', False) # (是截断)
+            ):
+                with torch.no_grad():
+                    terminal_value = self.policy.predict_value(step_infos[idx].get('terminal_observation'))
+                    terminal_value: ndarray = converto_ndarray(terminal_value)
+                rewards[idx] += self.config.buffer_config.gamma * terminal_value
+            return rewards
+    
+    def _early_stop(self, log_prob: Tensor, old_log_probs: RolloutBatchData) -> bool:
+        with torch.no_grad():
+            log_ratio = log_prob - old_log_probs
+            approx_kl_div = torch.mean((torch.exp(log_ratio) - 1) - log_ratio).cpu().numpy()
+        
+        if self.config.target_kl is not None and approx_kl_div > 1.5 * self.config.target_kl:
+            return True
+        return False
+
+    def _update_remaining(self, num_step: int):
+        self._remaining = 1.0 - float(num_step / self.config.total_steps)
+
+    def _clip_range(self):
+        return self.schedule(self._remaining)
+    
+    def _create_logger(self):
+        self.logger: Logger = Logger(self.config.logger_config)
+
+        if hasattr(self, 'final_evaluate_path'):
+            self.logger.write_tabel_additional_params(['final_evaluate_path'], [os.path.basename(self.final_evaluate_path)])
+
+
+
+if __name__ == '__main__':
+    ppo_config = PPOConfig()
+    ppo = PPO(ppo_config)
+    
+    # 开始执行ppo算法
+    ppo.start()
