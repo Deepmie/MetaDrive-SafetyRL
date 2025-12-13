@@ -2,6 +2,7 @@ from dataclasses import dataclass, field
 from metadrive.utils.doc_utils import generate_gif
 from typing import Optional, List
 from numpy import ndarray
+import numpy as np
 
 @dataclass
 class ActionType:

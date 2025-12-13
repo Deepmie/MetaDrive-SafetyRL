@@ -14,7 +14,7 @@ from metadrive.custom2_version2.schedule import ConstantSchedule
 from metadrive.custom2_version2.utils import set_random_seed, converto_ndarray, converto_torch, Logger, Timer
 from metadrive.custom2_version2.create_env import create_env, create_render_config
 from metadrive.custom2_version2.type import ActionType, RenderClass
-from metadrive.custom2_version2.controller import Controller, EvalController
+from metadrive.custom2_version2.controller2 import Controller
 from metadrive.utils.doc_utils import generate_gif
 from typing import Tuple, Dict, Union, Optional, List, cast
 from tqdm import tqdm
@@ -44,8 +44,8 @@ class PPO:
         self._last_obss  = self.env.reset() # 初始化第一次的env
         self.env_eval.reset()
         
-        self.controller: Controller = Controller(self.env, self.config.controller_config)
-        self.controller_eval: EvalController = EvalController(self.env_eval, self.config.controller_config)
+        self.controller: Controller      = Controller(self.env, self.config.controller_config, eval_mode=False)
+        self.controller_eval: Controller = Controller(self.env_eval, self.config.controller_config, eval_mode=True)
         self.timer: Timer = Timer()
         self.render_class: RenderClass = RenderClass()
 
@@ -68,44 +68,44 @@ class PPO:
         _process_name_ = 'Sample & Train'
         self.timer.start(_process_name_)
         is_suc, info = self._start()
-        self.logger.write_time(self.timer.end(), _process_name_)
+        if is_suc: self.logger.write_time(self.timer.end(), _process_name_)
         return is_suc, info
     
     def _start(self) -> Tuple[bool, str]:
-        try:
-            self.policy.train()
-            pbar = tqdm(total=self.config.total_steps, desc='total')
-            iterations = 0
-            evaluate_idx = 0
-            best_reward = -float('inf')
-            while self.num_steps < self.config.total_steps:
-                print('\nstart to sample...')
-                self._sample()
-                iterations += 1
-                self.num_steps = self.config.n_process * iterations * self.config.sample_steps
-                self._update_remaining(self.num_steps)
-                pbar.update(self.config.n_process * self.config.sample_steps)
+        # try:
+        self.policy.train()
+        pbar = tqdm(total=self.config.total_steps, desc='total')
+        iterations = 0
+        evaluate_idx = 0
+        best_reward = -float('inf')
+        while self.num_steps < self.config.total_steps:
+            print('\nstart to sample...')
+            self._sample()
+            iterations += 1
+            self.num_steps = self.config.n_process * iterations * self.config.sample_steps
+            self._update_remaining(self.num_steps)
+            pbar.update(self.config.n_process * self.config.sample_steps)
 
-                print('\nstart to train...')
-                self._train()
+            print('\nstart to train...')
+            self._train()
 
-                if self.num_steps >= (evaluate_idx + 1) * self.config.evaluate_steps:
-                    print('\nstart to evaluate & save...')
-                    reward_eval = self._evaluate()
-                    self.logger.write_reward(reward_eval)
-                    evaluate_idx += 1
-                    self._save(ckp_pth=self.config.policy_checkpoint_pth)
-                    if reward_eval > best_reward: self._save(ckp_pth=self.config.best_policy_checkpoint_pth); best_reward = reward_eval
-            
-            self._start_successful = True
-            start_info = 'Successful!'
-        except Exception:
-            self._start_successful = False
-            start_info = traceback.format_exc()
-        finally:
-            if not self._start_successful:
-                self.close()
-        return self._start_successful, start_info
+            if self.num_steps >= (evaluate_idx + 1) * self.config.evaluate_steps:
+                print('\nstart to evaluate & save...')
+                reward_eval = self._evaluate()
+                self.logger.write_reward(reward_eval)
+                evaluate_idx += 1
+                self._save(ckp_pth=self.config.policy_checkpoint_pth)
+                if reward_eval > best_reward: self._save(ckp_pth=self.config.best_policy_checkpoint_pth); best_reward = reward_eval
+        
+        self._start_successful = True
+        start_info = 'Successful!'
+        # except Exception:
+        #     self._start_successful = False
+        #     start_info = traceback.format_exc()
+        # finally:
+        #     if not self._start_successful:
+        #         self.close()
+        # return self._start_successful, start_info
     
     def final_eval(self):
         reward_eval = self._evaluate(True, self.final_evaluate_path)
@@ -142,13 +142,14 @@ class PPO:
             actions, log_probs, values = self.policy.select_action(self._last_obss)
             
             # 底层控制
-            control_values, _ = self.controller.control(actions, self._last_dones)
+            controller_result = self.controller.control(actions, self._last_dones)
 
-            obs_nexts, rewards, dones, step_infos = self.env.step(control_values)
+            obs_nexts, rewards, dones, step_infos = self.env.step(controller_result.control_values_modified)
             rewards = self._bootstraping(rewards, dones, step_infos)
             
             # 存入buffer
-            self.buffer.push(self._last_obss, actions, rewards, self._last_dones, log_probs, values)
+            self.buffer.push(self._last_obss, actions, rewards, self._last_dones, log_probs, values,  # 正常ppo的
+                             controller_result.state_values[2::], controller_result.state_values_modified[2::], )
             
             self._last_obss = obs_nexts # update observation
             self._last_dones = dones    # update done
@@ -186,13 +187,9 @@ class PPO:
                 advantages = (advantages - advantages.mean()) / (advantages.std() + 1e-8)
 
                 ratio = torch.exp(log_probs - rollout_data.old_log_probs)
-
-                policy_loss_1 = advantages * ratio
-                policy_loss_2 = advantages * torch.clamp(ratio, 1 - clip_range, 1 + clip_range)
-                policy_loss = -torch.min(policy_loss_1, policy_loss_2).mean()
-
+                
+                policy_loss = self._get_policy_loss(rollout_data.obss, advantages, ratio, rollout_data.z_mpcs, rollout_data.z_cbfs, clip_range)
                 value_loss = mse_loss(rollout_data.returns.flatten(), values.flatten())
-
                 entropy_loss = -torch.mean(entropys)
 
                 loss = policy_loss + self.config.entropy_coef * entropy_loss + self.config.value_loss_coef * value_loss
@@ -225,8 +222,8 @@ class PPO:
         
         for _ in range(self.config.evaluate_total_steps):
             action, _ = self.predict(obs, deterministic=True)
-            control_value, _ = self.controller_eval.control(action, last_done)
-            obs, reward, done, step_info = self.env_eval.step(control_value)
+            controller_result = self.controller_eval.control(action, last_done)
+            obs, reward, done, step_info = self.env_eval.step(controller_result.control_values_modified)
             
             total_reward += reward
             if is_render: self.render_class.add_frame(self._render(render_row_text))
@@ -250,6 +247,30 @@ class PPO:
     def _create_render_text(self) -> Dict:
         metadriveenv_config = self.config.metadriveenv_config
         return dict(traffic_mode = metadriveenv_config.traffic_mode, step = None)
+    
+    def _get_policy_loss(self, obss: Tensor, advantages: Tensor, ratio: Tensor, z_mpcs: Tensor, z_cbfs: Tensor, clip_range: float) -> Tensor:
+        # create index
+        bc_index = torch.norm(z_cbfs - z_mpcs, p=1, dim=1) > self.config.delta_bc
+        standard_index = (bc_index == False)
+        
+        # caculate standard loss:
+        if (~standard_index).all():
+            standard_loss = 0.0
+        else:
+            standard_loss_1 = advantages[standard_index] * ratio[standard_index]
+            standard_loss_2 = advantages[standard_index] * torch.clamp(ratio[standard_index], 1 - clip_range, 1 + clip_range)
+            standard_loss = -torch.min(standard_loss_1, standard_loss_2).mean()
+        
+        # caculate bc loss:
+        if (~bc_index).all():
+            bc_loss = 0.0
+        else:
+            pi_action = self.policy.act_mean(obss[bc_index])
+            omega = 1 + torch.exp(torch.norm(z_cbfs[bc_index] - z_mpcs[bc_index], p=2, dim=1))
+            bc_loss = (omega * torch.norm(z_cbfs[bc_index] - pi_action, p=2, dim=1)).mean()
+
+        policy_loss = standard_loss + self.config.bc_coef * bc_loss
+        return policy_loss
 
     def _bootstraping(self, rewards: ndarray, dones: ndarray, step_infos: List[Dict]) -> ndarray:
         '''
@@ -280,7 +301,8 @@ class PPO:
     def _update_remaining(self, num_step: int):
         self._remaining = 1.0 - float(num_step / self.config.total_steps)
 
-    def _clip_range(self):
+    
+    def _clip_range(self) -> float:
         return self.schedule(self._remaining)
     
     def _create_logger(self):

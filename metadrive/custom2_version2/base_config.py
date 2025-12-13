@@ -7,7 +7,7 @@ from typing import Dict, Optional, List, Tuple
 from metadrive.custom2_version2.type import ActionType
 from metadrive.custom2_version2.distribution import CategoricalDistribution, MultiCategoricalDistribution
 
-TEST_MODE            = False
+TEST_MODE            = True
 STATE_DIM            = 259
 ACTION_DIM           = 2
 TORCH_DTYPE          = torch.float32
@@ -41,7 +41,7 @@ class EnvConfig:
 @dataclass
 class MetaDriveEnvConfig:
     map: str                      = 'O'        # 地图形状
-    traffic_density: float        = 0.5        # 交通状况
+    traffic_density: float        = 0.7        # 交通状况
     # 交通模式, option: trigger, respawn, hybrid, basic
     traffic_mode: str             = 'trigger'
     horizon: int                  = 1000       # ego存活序列数
@@ -89,14 +89,15 @@ class PolicyConfig:
 
 @dataclass
 class RolloutBufferConfig:
-    state_dim: int = STATE_DIM
-    action_dim: int = ACTION_DIM
-    batch_size: int = BATCH_SIZE
+    state_dim: int       = STATE_DIM
+    action_dim: int      = ACTION_DIM
+    high_state_dim: int  = 2
+    batch_size: int      = BATCH_SIZE
     device: torch.device = TORCH_DEVICE
     max_buffer_size: int = MAX_BUFFER_SIZE
-    gamma: float = GAMMA  # 计算优势函数的参数之一
-    gae_lambda: float = GAE_LAMBDA  # 计算优势函数的参数之一
-    n_process: int    = N_PROCESS # 进程数量
+    gamma: float         = GAMMA           # 计算优势函数的参数之一
+    gae_lambda: float    = GAE_LAMBDA      # 计算优势函数的参数之一
+    n_process: int       = N_PROCESS       # 进程数量
 
 
 @dataclass
@@ -133,6 +134,7 @@ class PPOConfig:
     batch_size: int                  = BATCH_SIZE
     epsilon: float                   = 0.2
     entropy_coef: float              = 0.0
+    bc_coef: float                   = 1.0
     value_loss_coef: float           = 0.5
     learning_rate: float             = 3e-4
     max_grad_norm: float             = 0.5
@@ -141,6 +143,7 @@ class PPOConfig:
     evaluate_steps: int              = EVALUATE_STEPS
     evaluate_total_steps: int        = EVALUATE_TOTAL_STEPS
     is_load: bool                    = IS_LOAD
+    delta_bc: float                  = 1.0
     logger_save_root: str            = 'dp_single_version2/logger'
     policy_checkpoint_pth: str       = 'dp_single_version2/ckp_pth/policy.pth'
     best_policy_checkpoint_pth: str  = 'dp_single_version2/ckp_pth/best_policy.pth'

@@ -17,6 +17,8 @@ class RolloutBatchData:
     old_values: Tensor
     advantages: Tensor
     returns: Tensor
+    z_mpcs: Tensor
+    z_cbfs: Tensor
     
     def move_to_device(self, device: torch.device):
         self.obss          = self.obss.to(device)
@@ -27,6 +29,8 @@ class RolloutBatchData:
         self.old_values    = self.old_values.to(device)
         self.advantages    = self.advantages.to(device)
         self.returns       = self.returns.to(device)
+        self.z_mpcs        = self.z_mpcs.to(device)
+        self.z_cbfs        = self.z_cbfs.to(device)
 
 
 class RolloutBuffer:
@@ -34,7 +38,7 @@ class RolloutBuffer:
         self.config = config
         self.reset()
     
-    def push(self, states: ndarray, actions: ndarray, rewards: ndarray, dones: ndarray, log_probs: Tensor, values: Tensor):
+    def push(self, states: ndarray, actions: ndarray, rewards: ndarray, dones: ndarray, log_probs: Tensor, values: Tensor, z_mpcs: ndarray, z_cbfs: ndarray):
         if self._idx >= self.config.max_buffer_size:
             raise IndexError(f'index out of range, max buffer size = {self.config.max_buffer_size}.')
         
@@ -46,9 +50,11 @@ class RolloutBuffer:
         self.dones[_slice, :]      = torch.from_numpy(dones).to(torch.long)
         self.log_probs[_slice, :]  = log_probs.clone().detach().to(torch.float32)
         self.values[_slice, :]     = values.clone().detach().to(torch.float32)
+        self.z_mpcs[_slice, ...]   = torch.from_numpy(z_mpcs).to(torch.float32)
+        self.z_cbfs[_slice, ...]   = torch.from_numpy(z_cbfs).to(torch.float32)
         self._idx += 1 # 索引后移n位
 
-    def compute_advantage(self, values: Tensor, dones: Tensor):    
+    def compute_advantage(self, values: Tensor, dones: Tensor):
         advantage_lasts: int = 0
         for t in range(self._idx-1, -1, -1):
             if t == self._idx-1: # 初始条件
@@ -67,17 +73,24 @@ class RolloutBuffer:
         self.returns = self.advantages + self.values
 
     def reset(self):
-        self.states: Tensor        = self._init_tensor(self.config.max_buffer_size, self.config.state_dim, dtype=torch.float32)  # 2d vector
-        self.actions: Tensor       = self._init_tensor(self.config.max_buffer_size, self.config.action_dim, dtype=torch.float32) # 2d vector
-        self.rewards: Tensor       = self._init_tensor(self.config.max_buffer_size, dtype=torch.float32)                         # 1d vector
-        self.dones: Tensor         = self._init_tensor(self.config.max_buffer_size, dtype=torch.long)                            # 1d vector
-        self.log_probs: Tensor     = self._init_tensor(self.config.max_buffer_size, dtype=torch.float32)                         # 1d vector
-        self.values: Tensor        = self._init_tensor(self.config.max_buffer_size, dtype=torch.float32)                         # 1d vector
-        self.advantages: Tensor    = self._init_tensor(self.config.max_buffer_size, dtype=torch.float32)                         # 1d vector
-        self.returns: Tensor       = self._init_tensor(self.config.max_buffer_size, dtype=torch.float32)                         # 1d vector
+        self.states: Tensor     = self._init_tensor(self.config.max_buffer_size, self.config.state_dim, dtype=torch.float32)        # 2d vector
+        self.actions: Tensor    = self._init_tensor(self.config.max_buffer_size, self.config.action_dim, dtype=torch.float32)       # 2d vector
+        self.rewards: Tensor    = self._init_tensor(self.config.max_buffer_size, dtype=torch.float32)                               # 1d vector
+        self.dones: Tensor      = self._init_tensor(self.config.max_buffer_size, dtype=torch.long)                                  # 1d vector
+        self.log_probs: Tensor  = self._init_tensor(self.config.max_buffer_size, dtype=torch.float32)                               # 1d vector
+        self.values: Tensor     = self._init_tensor(self.config.max_buffer_size, dtype=torch.float32)                               # 1d vector
+        self.z_mpcs: Tensor     = self._init_tensor(self.config.max_buffer_size, self.config.high_state_dim, dtype=torch.float32)   # 2d vector
+        self.z_cbfs: Tensor     = self._init_tensor(self.config.max_buffer_size, self.config.high_state_dim, dtype=torch.float32)   # 2d vector
+        
+        self.advantages: Tensor = self._init_tensor(self.config.max_buffer_size, dtype=torch.float32)                               # 1d vector
+        self.returns: Tensor    = self._init_tensor(self.config.max_buffer_size, dtype=torch.float32)                               # 1d vector
+        
+
+        # ============other data========== #
         self._idx = 0
         self._next_value = 0
         self._have_flatten = False
+        # ================================ #
 
     def get(self): # 构造一个生成器
         _len = self._idx * self.config.n_process
@@ -102,6 +115,8 @@ class RolloutBuffer:
                 old_values    = self.values[indice].flatten(),
                 advantages    = self.advantages[indice].flatten(),
                 returns       = self.returns[indice].flatten(),
+                z_mpcs        = self.z_mpcs[indice],
+                z_cbfs        = self.z_cbfs[indice],
             )
 
     def _flatten_tensor(self):
@@ -109,10 +124,12 @@ class RolloutBuffer:
         self.actions       = self._flatten(self.actions)
         self.rewards       = self._flatten(self.rewards)
         self.dones         = self._flatten(self.dones)
-        self.log_probs = self._flatten(self.log_probs)
-        self.values    = self._flatten(self.values)
+        self.log_probs     = self._flatten(self.log_probs)
+        self.values        = self._flatten(self.values)
         self.advantages    = self._flatten(self.advantages)
         self.returns       = self._flatten(self.returns)
+        self.z_mpcs        = self._flatten(self.z_mpcs)
+        self.z_cbfs        = self._flatten(self.z_cbfs)
 
     def _flatten(self, t: Tensor): # t.shape = 2 or 3
         if len(t.shape) < 3:

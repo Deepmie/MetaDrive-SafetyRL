@@ -45,7 +45,8 @@ class Policy(nn.Module):
         distribution: Distribution = self._get_distribution_from_latent(latent_policy)
         action: Tensor = distribution.get_action(deterministic=deterministic)
         log_prob: Tensor = distribution.log_prob(action)
-        return action, value, log_prob
+        action_mean: Tensor = distribution.get_action(deterministic=True)
+        return action, value, log_prob, action_mean
 
     def select_action(self, obss: Union[ndarray, Tensor]) -> Tuple[ndarray, float, float]:
         obss: Tensor = converto_torch(obss)
@@ -55,7 +56,7 @@ class Policy(nn.Module):
             obss = obss.unsqueeze(dim = 0)
 
         with torch.no_grad():
-            actions, values, log_probs = self.forward(obss)
+            actions, values, log_probs, _ = self.forward(obss)
         
         actions: ndarray = converto_ndarray(actions)   # 动作转换成ndarray
         return actions, log_probs, values
@@ -70,6 +71,12 @@ class Policy(nn.Module):
         log_probs = distributaion.log_prob(actions)
         entropys = distributaion.entropy()
         return values, log_probs, entropys
+    
+    def act_mean(self, obss: Union[ndarray, Tensor]) -> Tensor:
+        obss: Tensor = converto_torch(obss)
+        with torch.no_grad():
+            _, _, _, action_means = self.forward(obss)
+        return action_means
 
     def predict(self, obs: Union[ndarray, Tensor], state: Optional[ndarray] = None, deterministic: bool = False):
         obs: Tensor = converto_torch(obs).unsqueeze(dim=0)

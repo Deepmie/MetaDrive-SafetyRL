@@ -1,16 +1,20 @@
-from metadrive.customs.ocp.base import OCP
-from metadrive.customs.ocp.config import CBFconfig
-from metadrive.customs.type import AgentInfo
-from metadrive.engine.base_engine import BaseEngine
+from metadrive.custom2_version2.type import VehicleState
+from metadrive.custom2_version2.ocp.config import CBFconfig
+from metadrive.custom2_version2.ocp.base import OCP
 from typing import Dict, cast
 import casadi as ca
 import numpy as np
 from numpy import ndarray
 
 class CBF(OCP):
-    def __init__(self, config: CBFconfig, agent_info: AgentInfo):
-        super(CBF, self).__init__(config, agent_info)
-        self.config = cast(CBFconfig, self.config)
+    def __init__(self, config: CBFconfig, metadata: Dict):
+        '''
+        config: CBF的配置,
+        metadata: 一些常量配置, 不应该在update中改变
+        '''
+        self.lf = metadata.get('lf', None)
+        self.lr = metadata.get('lr', None)
+        super(CBF, self).__init__(config, metadata)
     
     def __call__(self, x0, u0, mask, info):
         res: Dict = super(CBF, self).__call__(x0, u0, mask, info)
@@ -93,13 +97,14 @@ class CBF(OCP):
         u  = ca.MX.sym( 'u', self.config.nu)
         du = ca.MX.sym('du', self.config.nu)
 
+        u_modify = u + du
         # 状态更新方程
-        beta = ca.atan(1 / 2 * ca.tan(u[1] + du[1]))
+        beta = ca.atan(ca.tan(u_modify[1]) * self.lr / (self.lf + self.lr))
         x_next = ca.vertcat(
-            x[0] + (x[2] * ca.cos(x[3] + beta)) * self.config.Ts,
-            x[1] + (x[2] * ca.sin(x[3] + beta)) * self.config.Ts,
-            x[2] + (u[0] + du[0]) * self.config.Ts,
-            x[3] + x[2] / self.agent_info.l * ca.sin(beta) * self.config.Ts,
+            x[0] + x[2] * ca.cos(x[3] + beta) * self.config.Ts,
+            x[1] + x[2] * ca.sin(x[3] + beta) * self.config.Ts,
+            x[2] + u_modify[0] * self.config.Ts,
+            x[3] + x[2] / self.lr * ca.sin(beta) * self.config.Ts,
         )
         self._f = ca.Function('f', [x, u, du], [x_next])
     

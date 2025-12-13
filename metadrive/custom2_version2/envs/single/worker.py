@@ -1,12 +1,14 @@
 from metadrive.custom2_version2.envs.utils import CloudpickleWrapper, Commond
 from metadrive.custom2_version2.utils import set_random_seed
 from metadrive.component.vehicle.default_vehicle import DefaultVehicle
+from metadrive.component.vehicle.base_vehicle import BaseVehicle
+from metadrive.base_class.base_object import BaseObject
 from metadrive import MetaDriveEnv
 from multiprocessing.connection import Connection
 import traceback
-from typing import Dict, Callable, Any, Tuple
+from typing import Dict, Callable, Any, Tuple, cast
 from numpy import ndarray
-
+import numpy as np
 
 class Worker:
     def __init__(
@@ -51,6 +53,23 @@ class Worker:
             lf = agent.FRONT_WHEELBASE,
             lr = agent.REAR_WHEELBASE,
         )
+    
+    def get_all_vehicle_position(self) -> Tuple[ndarray, ndarray]:
+        # help function
+        def _filter_other_object(obj: BaseObject):
+            if not isinstance(obj, BaseVehicle):
+                return False
+            obj = cast(BaseVehicle, obj)
+            if obj.id == self.env.agent.id:
+                return False
+            return True
+        
+        info = np.empty([self.cbf_config.N, self.cbf_config.info_dim])
+        mask = np.ones([self.cbf_config.N, ])
+        for idx, (oid, obj) in enumerate(self.env.engine.get_objects(filter=_filter_other_object).items()):
+            obj = cast(BaseVehicle, obj)
+            info[idx, 0: 2] = obj.position
+        return info, mask
     
     def close(self) -> str:
         self.env.close()
