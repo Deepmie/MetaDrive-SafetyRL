@@ -1,5 +1,5 @@
 import time
-from typing import Optional, Dict
+from typing import Optional, Tuple, Dict
 
 class Timer:
     def __init__(self):

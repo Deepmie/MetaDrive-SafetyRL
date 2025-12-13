@@ -3,6 +3,7 @@ from casadi import DM, MX
 import numpy as np
 from numpy import ndarray
 from typing import Tuple, Dict
+from metadrive.custom2_version2.type import VehicleState
 from metadrive.custom2_version2.ocp.config import MPConfig
 from metadrive.custom2_version2.ocp.base import OCP
 

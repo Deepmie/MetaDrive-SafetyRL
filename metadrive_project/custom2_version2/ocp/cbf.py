@@ -1,6 +1,7 @@
+from metadrive.custom2_version2.type import VehicleState
 from metadrive.custom2_version2.ocp.config import CBFconfig
 from metadrive.custom2_version2.ocp.base import OCP
-from typing import Dict, Tuple
+from typing import Dict, cast, Tuple
 import casadi as ca
 import numpy as np
 from numpy import ndarray

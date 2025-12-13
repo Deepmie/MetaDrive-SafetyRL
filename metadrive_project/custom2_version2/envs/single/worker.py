@@ -1,4 +1,5 @@
 from metadrive.custom2_version2.envs.utils import CloudpickleWrapper, Commond
+from metadrive.custom2_version2.utils import set_random_seed
 from metadrive.component.vehicle.default_vehicle import DefaultVehicle
 from metadrive.component.vehicle.base_vehicle import BaseVehicle
 from metadrive.base_class.base_object import BaseObject
@@ -9,7 +10,6 @@ import traceback
 from typing import Dict, Callable, Any, Tuple, cast
 from numpy import ndarray
 import numpy as np
-
 
 class Worker:
     def __init__(
@@ -33,9 +33,6 @@ class Worker:
         done: bool = terminated or truncated
         reset_info = dict()
         step_info['TimeLimit.truncated'] = truncated and not terminated
-        if done:
-            step_info['terminal_observation'] = obs
-            obs, reset_info = self.env.reset()
         return obs, reward, done, step_info, reset_info
     
     def reset(self) -> Tuple:
@@ -43,8 +40,8 @@ class Worker:
         obs, reset_info = self.env.reset()
         return obs, reset_info
     
-    def render(self, mode, screen_record, window, screen_size, camera_position) -> ndarray:
-        return self.env.render(mode, screen_record, window, screen_size, camera_position)
+    def render(self, mode, screen_record, window, screen_size, camera_position, text) -> ndarray:
+        return self.env.render(mode=mode, screen_record=screen_record, window=window, screen_size=screen_size, camera_position=camera_position, text=text)
     
     def get_state(self) -> Dict:
         agent: DefaultVehicle = self.env.agent
@@ -113,3 +110,6 @@ def worker_func(
 ):
     worker = Worker(par_remotes, sub_remotes, env_wrapper, env_idx)
     worker.run()
+
+
+

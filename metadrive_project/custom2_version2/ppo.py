@@ -15,10 +15,12 @@ from metadrive.custom2_version2.utils import set_random_seed, converto_ndarray, 
 from metadrive.custom2_version2.create_env import create_env, create_render_config
 from metadrive.custom2_version2.type import ActionType, RenderClass
 from metadrive.custom2_version2.controller import Controller
+from metadrive.utils.doc_utils import generate_gif
 from typing import Tuple, Dict, Union, Optional, List, cast
 from tqdm import tqdm
 from functools import partial
 from datetime import datetime
+import traceback
 import os
 
 class PPO:

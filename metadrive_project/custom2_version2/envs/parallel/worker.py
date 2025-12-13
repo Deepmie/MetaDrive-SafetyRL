@@ -1,4 +1,5 @@
 from metadrive.custom2_version2.envs.utils import CloudpickleWrapper, Commond
+from metadrive.custom2_version2.utils import set_random_seed
 from metadrive.component.vehicle.default_vehicle import DefaultVehicle
 from metadrive.component.vehicle.base_vehicle import BaseVehicle
 from metadrive.base_class.base_object import BaseObject

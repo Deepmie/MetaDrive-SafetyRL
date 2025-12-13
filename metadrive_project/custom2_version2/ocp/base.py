@@ -1,8 +1,9 @@
 from metadrive.custom2_version2.ocp.config import OCPconfig
+from metadrive.custom2_version2.type import VehicleState
 from abc import ABC, abstractmethod
 import casadi as ca
 from numpy import ndarray
-from typing import List, Dict, Tuple
+from typing import cast, List, Dict, Tuple
 import numpy as np
 
 class OCP(ABC):

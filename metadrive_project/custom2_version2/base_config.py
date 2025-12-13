@@ -3,8 +3,9 @@ import numpy as np
 import torch
 from torch.nn import Module, Tanh
 from numpy import ndarray
-from typing import Dict, Optional
+from typing import Dict, Optional, List, Tuple
 from metadrive.custom2_version2.type import ActionType
+from metadrive.custom2_version2.distribution import CategoricalDistribution, MultiCategoricalDistribution
 
 TEST_MODE            = True
 STATE_DIM            = 259

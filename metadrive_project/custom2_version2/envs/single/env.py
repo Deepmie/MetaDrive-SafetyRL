@@ -4,8 +4,9 @@ from metadrive.custom2_version2.base_config import ParallelEnvConfig
 import multiprocessing as mp
 from multiprocessing.context import BaseContext
 from multiprocessing import Process
-from typing import Tuple, Dict, cast
+from typing import List, Tuple, Dict, cast
 from numpy import ndarray
+import numpy as np
 
 
 class SingleEnv:

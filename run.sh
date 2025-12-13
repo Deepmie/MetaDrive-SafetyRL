@@ -17,6 +17,10 @@ case "$1" in
         echo "evaluate best policy from checkpoint..."
         CUDA_VISIBLE_DEVICES=1 python dp_single_version2/eval.py --type best
     ;;
+    generate)
+        echo "generate code from project..."
+        python generate_code.py
+    ;;
     *)
         echo "instruction error, must choose in [train, check_env, eval, best_eval], you give \`$1\`."
     ;;

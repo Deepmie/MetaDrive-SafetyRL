@@ -1,8 +1,8 @@
 from metadrive.custom2_version2.envs.utils import CloudpickleWrapper, Commond
-from metadrive.custom2_version2.utils import set_random_seed
 from metadrive.component.vehicle.default_vehicle import DefaultVehicle
 from metadrive.component.vehicle.base_vehicle import BaseVehicle
 from metadrive.base_class.base_object import BaseObject
+from metadrive.custom2_version2.ocp import CBFconfig
 from metadrive import MetaDriveEnv
 from multiprocessing.connection import Connection
 import traceback
@@ -25,7 +25,8 @@ class Worker:
         self.env_idx = env_idx
         self.running = False
         self.func_names: Dict[str, Callable] = {func_name: getattr(self, func_name) for func_name in dir(self) if not func_name.startswith('_')}
-    
+        self.cbf_config = CBFconfig()
+
     def step(self, action: ndarray) -> Tuple:
         obs, reward, terminated, truncated, step_info = self.env.step(action)
         done: bool = terminated or truncated

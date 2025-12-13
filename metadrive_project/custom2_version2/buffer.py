@@ -4,7 +4,8 @@ import numpy as np
 import torch
 from numpy import ndarray
 from torch import Tensor
-from typing import Optional
+from typing import List, Optional
+from torch.utils.data import Dataset, DataLoader
 
 @dataclass
 class RolloutBatchData:

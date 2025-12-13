@@ -3,6 +3,7 @@ from numpy import ndarray
 import numpy as np
 from typing import Tuple, Union, Dict, cast, Optional
 import torch.nn as nn
+from torch.nn.functional import softplus
 import torch
 from functools import partial
 from metadrive.custom2_version2.distribution import \

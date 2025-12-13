@@ -3,6 +3,7 @@ from metadrive.utils.doc_utils import generate_gif
 from metadrive.custom2_version2.base_config import MetaDriveEnvConfig
 from numpy import ndarray
 from typing import List, Dict, Optional
+from datetime import datetime
 from dataclasses import asdict
 
 def create_env(config: MetaDriveEnvConfig) -> MetaDriveEnv:
