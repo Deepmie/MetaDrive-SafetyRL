@@ -58,16 +58,20 @@ class Controller:
         for idx, (state, info, mask, ) in enumerate(zip(vehicle_states_init, infos, masks)):
             x0 = np.array([state.x, state.y, state.v, state.theta])
             z_ref = actions[idx, :]
-            u_prev = self.control_values_prev[idx, :]
-            u_mpc, x_mpc = self.mpc_controller(x0, z_ref, u_prev)
+            u_prev = self.controller_result.control_values_prev[idx, :]
+            u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev)
             u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
             self._check_solve_results(x0, x_mpc[0, :], 'mpc x')
             
             # 求解修正的控制量
-            u_cbf, du_cbf, x_cbf = self.cbf_controller(x0, u_mpc[0, :], info, mask)
+            u_cbf, du_cbf, x_cbf, solve_info_cbf = self.cbf_controller(x0, u_mpc[0, :], info, mask)
             self._check_solve_results(x0, x_cbf[0, :], 'cbf x')
             self._check_solve_results(u_mpc[0, :], u_cbf[0, :], 'cbf u')
             
+            if not bool(solve_info_cbf.get('success')): # cbf解不出来(无论怎样都满足不了...)
+                u_cbf = None; x_cbf = deepcopy(x_mpc)
+                du_cbf = np.zeros([1, self.mpc_config.nu])
+
             # 存入结果类中
             self.controller_result.push(x_mpc[1, :], x_cbf[1, :], u_mpc[0, ::-1], du_cbf[0, ::-1])
         
@@ -77,9 +81,9 @@ class Controller:
 
     def _build_controller(self):
         metadata = self.env.get_metadata()
-        mpc_config = MPConfig(); cbf_config = CBFconfig()
-        self.mpc_controller = MPC(mpc_config, metadata)
-        self.cbf_controller = CBF(cbf_config, metadata)
+        self.mpc_config = MPConfig(); self.cbf_config = CBFconfig()
+        self.mpc_controller = MPC(self.mpc_config, metadata)
+        self.cbf_controller = CBF(self.cbf_config, metadata)
 
     def _get_vehicle_state(self) -> List[VehicleState]:
         vehicle_states: List[Dict] = self.env.get_state() if not self.eval_mode else [self.env.get_state()]

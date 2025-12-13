@@ -64,11 +64,12 @@ class Worker:
                 return False
             return True
         
-        info = np.empty([self.cbf_config.N, self.cbf_config.info_dim])
-        mask = np.ones([self.cbf_config.N, ])
+        info = np.zeros([self.cbf_config.N, self.cbf_config.info_dim])
+        mask = np.zeros([self.cbf_config.N, ])
         for idx, (oid, obj) in enumerate(self.env.engine.get_objects(filter=_filter_other_object).items()):
             obj = cast(BaseVehicle, obj)
             info[idx, 0: 2] = obj.position
+            mask[idx] = 1
         return info, mask
     
     def close(self) -> str:

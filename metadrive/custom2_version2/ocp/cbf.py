@@ -1,7 +1,7 @@
 from metadrive.custom2_version2.type import VehicleState
 from metadrive.custom2_version2.ocp.config import CBFconfig
 from metadrive.custom2_version2.ocp.base import OCP
-from typing import Dict, cast
+from typing import Dict, cast, Tuple
 import casadi as ca
 import numpy as np
 from numpy import ndarray
@@ -22,7 +22,8 @@ class CBF(OCP):
     
     def _build_numeric_problem(self):
         # 决策设定决策变量的初值, 和值的上下界
-        w0 = np.zeros(self._nlp_metadata['w_dim'])
+        w0 = np.zeros(self._nlp_metadata['w_dim']) if not hasattr(self, '_last_w') else self._last_w
+
         lbw = np.concatenate([
             np.tile([self.config.a_min, self.config.delta_min], self._nlp_metadata['u_dim'] // 2),
             np.tile([self.config.a_min, self.config.delta_min], self._nlp_metadata['du_dim'] // 2),
@@ -55,7 +56,7 @@ class CBF(OCP):
 
         self._g = list()
         self._p = [x0, u0, ]
-        cost = 0.5 * ca.sumsqr(DU)
+        cost = ca.sumsqr(DU)
 
         # cons0[=]: 初始状态约束
         xk = X[0: self.config.nx]
@@ -90,7 +91,6 @@ class CBF(OCP):
             'g_equal_dim' : self.config.nx + self.config.nu + self.config.nx,
             'g_unequal_dim_1': self.config.N,
         }
-        
 
     def _define_state_update_equation(self):
         x  = ca.MX.sym( 'x', self.config.nx)
@@ -107,7 +107,6 @@ class CBF(OCP):
             x[3] + x[2] / self.lr * ca.sin(beta) * self.config.Ts,
         )
         self._f = ca.Function('f', [x, u, du], [x_next])
-    
     
     def _constraint_safety_lane_change_collision(self, pk, pk_next):
         '''
@@ -131,8 +130,7 @@ class CBF(OCP):
         self._p.append(mask)
         self._p.append(info)
 
-
-    def _parse_result(self, res: Dict):
+    def _parse_result(self, res: Dict) -> Tuple[ndarray, ndarray, ndarray, Dict]:
         '''
         解析求解器返回的结果.
 
@@ -142,10 +140,10 @@ class CBF(OCP):
         Returns:
             元组, 第一项是u, 形状是(1, nu); 第二项是du, 形状是(1, nu); 第三项是x, 形状是(2, nx).
         '''
-
         w: ndarray  = res.get('x', None).full().flatten()
         u: ndarray  = w[0: self._nlp_metadata['u_dim']].reshape(1, self.config.nu)
         du: ndarray = w[self._nlp_metadata['u_dim']: self._nlp_metadata['u_dim']+self._nlp_metadata['du_dim']].reshape(1, self.config.nu)
         x: ndarray  = w[self._nlp_metadata['u_dim']+self._nlp_metadata['du_dim']::].reshape(2, self.config.nx)
-
-        return (u, du, x)
+        solve_info = self._get_stats()
+        self._last_w = w
+        return u, du, x, solve_info

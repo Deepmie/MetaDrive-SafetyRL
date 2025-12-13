@@ -3,7 +3,7 @@ from metadrive.custom2_version2.type import VehicleState
 from abc import ABC, abstractmethod
 import casadi as ca
 from numpy import ndarray
-from typing import cast, List, Dict
+from typing import cast, List, Dict, Tuple
 import numpy as np
 
 class OCP(ABC):
@@ -15,7 +15,7 @@ class OCP(ABC):
 
     def __call__(self, *args, **kwargs) -> ndarray:
         if self._is_first_created:
-            opts = {'ipopt.print_level': 0, 'print_time': 0}
+            opts = {'ipopt.print_level': 0, 'print_time': 0, 'ipopt.print_user_options': 'yes'}
             self._caculate_cost_and_conditions()
             self._build_numeric_problem()
 
@@ -65,3 +65,7 @@ class OCP(ABC):
         if isinstance(args, int) or isinstance(args, float) or isinstance(args, bool):
             return [args]
         return args
+    
+    def _get_stats(self) -> Tuple:
+        stats: Dict = self.solver.stats()
+        return {'success': stats.get('success'), 'return_status': stats.get('return_status')}

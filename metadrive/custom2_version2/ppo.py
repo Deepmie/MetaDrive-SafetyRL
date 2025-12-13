@@ -149,7 +149,7 @@ class PPO:
             
             # 存入buffer
             self.buffer.push(self._last_obss, actions, rewards, self._last_dones, log_probs, values,  # 正常ppo的
-                             controller_result.state_values[2::], controller_result.state_values_modified[2::], )
+                             controller_result.state_values[:, 2::], controller_result.state_values_modified[:, 2::], )
             
             self._last_obss = obs_nexts # update observation
             self._last_dones = dones    # update done

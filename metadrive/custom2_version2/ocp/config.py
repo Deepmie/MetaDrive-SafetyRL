@@ -22,7 +22,7 @@ class MPConfig(OCPconfig):
 
 @dataclass
 class CBFconfig(OCPconfig):
-    N: int           = 50        # 假设当前地图最多50辆车
+    N: int           = 20        # 假设当前地图最多50辆车
     info_dim: int    = 2         # 需要车辆的信息维度
-    dist_min: int    = 0.5       # 需要保持的最小安全距离
-    gamma: float     = 0.1       # cbf参数之一
+    dist_min: int    = 1.5       # 需要保持的最小安全距离
+    gamma: float     = -0.5      # cbf参数之一

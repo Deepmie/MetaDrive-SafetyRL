@@ -28,7 +28,7 @@ def check_env(env: MetaDriveEnv):
     env.reset()
     frames: List[ndarray] = list()
     try:
-        for step in range(400):
+        for step in range(1):
             if step < 50 : action = [0, 0.5]
             elif 50 <= step < 400: action = [0, -0.1]
             obs, reward, done, _, _ = env.step(action)

@@ -28,10 +28,7 @@ class MPC(OCP):
 
     def _build_numeric_problem(self):
         # 设定决策变量的初值, 和值的上下界
-        if hasattr(self, '_last_w'):
-            w0 = self._last_w
-        else:
-            w0 = np.zeros(self._nlp_metadata['w_dim'])
+        w0 = np.zeros(self._nlp_metadata['w_dim']) if not hasattr(self, '_last_w') else self._last_w
         
         lbw = np.concatenate([
             np.tile([self.config.a_min, self.config.delta_min], self._nlp_metadata['u_dim'] // 2),
@@ -123,7 +120,7 @@ class MPC(OCP):
         )
         self._f = ca.Function('f', [x, u], [x_next])
 
-    def _parse_result(self, res: Dict) -> Tuple[ndarray, ndarray]:
+    def _parse_result(self, res: Dict) -> Tuple[ndarray, ndarray, Dict]:
         '''
         Args:
         res: 求解器solver返回的结果
@@ -134,6 +131,6 @@ class MPC(OCP):
         w: ndarray = res.get('x', None).full().flatten()
         u: ndarray = w[0: self._nlp_metadata['u_dim']].reshape(self.config.mu, self.config.nu)
         x: ndarray = w[self._nlp_metadata['u_dim']::].reshape(self.config.np + 1, self.config.nx)
-        
+        solve_info = self._get_stats()
         self._last_w = w
-        return (u, x)
+        return u, x, solve_info

@@ -41,9 +41,9 @@ class EnvConfig:
 @dataclass
 class MetaDriveEnvConfig:
     map: str                      = 'O'        # 地图形状
-    traffic_density: float        = 0.7        # 交通状况
+    traffic_density: float        = 0.3        # 交通状况
     # 交通模式, option: trigger, respawn, hybrid, basic
-    traffic_mode: str             = 'trigger'
+    traffic_mode: str             = 'respawn'
     horizon: int                  = 1000       # ego存活序列数
     random_spawn_lane_index: bool = False      # 车辆是否随机生成在某个车道上
     num_scenarios: int            = 1          # 场景的数量
