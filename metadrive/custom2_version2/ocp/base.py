@@ -14,7 +14,7 @@ class OCP(ABC):
 
     def __call__(self, *args, **kwargs) -> ndarray:
         if self._is_first_created:
-            opts = {'ipopt.print_level': 0, 'print_time': 0, 'ipopt.print_user_options': 'yes'}
+            opts = self.config.optim_config.asdict()
             self._caculate_cost_and_conditions()
             self._build_numeric_problem()
 
@@ -31,7 +31,18 @@ class OCP(ABC):
             p_args.extend(self._converto_list(kwargs[key]))
         
         p_args = np.array(p_args, dtype=np.float32)
-        return self.solver(**self._num_prob, p=p_args)
+        
+        solve_args = {**self._num_prob, 'p': p_args}
+        
+        if hasattr(self, '_last_w'): solve_args['x0'] = self._last_w
+        if hasattr(self, '_last_lam_g'): solve_args['lam_g0'] = self._last_lam_g
+        if hasattr(self, '_last_lam_x'): solve_args['lam_x0'] = self._last_lam_x
+        
+        result = self.solver(**solve_args)
+        self._last_w     = result['x'].full().flatten()
+        self._last_lam_g = result['lam_g'].full().flatten()
+        self._last_lam_x = result['lam_x'].full().flatten()
+        return result
 
     @ abstractmethod
     def _build_numeric_problem(self):
@@ -65,6 +76,11 @@ class OCP(ABC):
             return [args]
         return args
     
-    def _get_stats(self) -> Tuple:
+    def _get_stats(self) -> Dict:
         stats: Dict = self.solver.stats()
-        return {'success': stats.get('success'), 'return_status': stats.get('return_status')}
+        return {
+            'success': stats.get('success'),
+            'return_status': stats.get('return_status'),
+            'iter_count': stats.get('iter_count', 0),
+            'solve_time': stats.get('t_wall_total', 0),
+        }

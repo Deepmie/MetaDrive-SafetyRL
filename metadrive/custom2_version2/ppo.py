@@ -11,7 +11,7 @@ from metadrive.custom2_version2.policy import Policy
 from metadrive.custom2_version2.buffer import RolloutBuffer, RolloutBatchData
 from metadrive.custom2_version2.envs import ParallelEnv, SingleEnv
 from metadrive.custom2_version2.schedule import ConstantSchedule
-from metadrive.custom2_version2.utils import set_random_seed, converto_ndarray, converto_torch, Logger, Timer
+from metadrive.custom2_version2.utils import converto_ndarray, converto_torch, Logger, Timer
 from metadrive.custom2_version2.create_env import create_env, create_render_config
 from metadrive.custom2_version2.type import ActionType, RenderClass
 from metadrive.custom2_version2.controller import Controller
@@ -23,7 +23,6 @@ import os
 
 class PPO:
     def __init__(self, config: PPOConfig, eval_mode: bool = False):
-        set_random_seed(0) # 设置随机种子
         self.config = config
         self.now_datetime = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
         self.final_evaluate_path = f'{self.config.evaluate_save_root}/demo_{self.now_datetime}.gif'
@@ -44,9 +43,9 @@ class PPO:
         
         self.controller: Controller      = Controller(self.env, self.config.controller_config, eval_mode=False)
         self.controller_eval: Controller = Controller(self.env_eval, self.config.controller_config, eval_mode=True)
-        self.timer: Timer = Timer()
-        self.render_class: RenderClass = RenderClass()
-
+        self.timer: Timer                = Timer()
+        self.render_class: RenderClass   = RenderClass()
+        
         if not eval_mode:
             self._create_logger()
         
@@ -103,7 +102,7 @@ class PPO:
         # finally:
         #     if not self._start_successful:
         #         self.close()
-        # return self._start_successful, start_info
+        return self._start_successful, start_info
     
     def final_eval(self):
         reward_eval = self._evaluate(True, self.final_evaluate_path)
@@ -119,11 +118,12 @@ class PPO:
         self.env_eval.close()
         if hasattr(self, 'logger'): self.logger.close()
 
-    def load_weight_from_checkpoint(self, load_path: Optional[str] = None):
+    def load_weight_from_checkpoint(self, load_path: Optional[str] = None) -> Dict:
         if load_path is None:
             load_path = self.config.policy_checkpoint_pth
-        self.policy.load_state_dict(torch.load(f=load_path))
+        meatadata = self._load(load_path)
         print(f'load weight from `{load_path}` successfully!')
+        return meatadata
 
     def _sample(self):
         pbar = tqdm(total=self.config.sample_steps, desc='sample')
@@ -138,9 +138,10 @@ class PPO:
             
             # 上层决策
             actions, log_probs, values = self.policy.select_action(self._last_obss)
+            transed_actions = self._trans_rl_to_control(actions)
             
             # 底层控制
-            controller_result = self.controller.control(actions, self._last_dones)
+            controller_result = self.controller.control(transed_actions, self._last_dones)
 
             obs_nexts, rewards, dones, step_infos = self.env.step(controller_result.control_values_modified)
             rewards = self._bootstraping(rewards, dones, step_infos)
@@ -186,7 +187,7 @@ class PPO:
 
                 ratio = torch.exp(log_probs - rollout_data.old_log_probs)
                 
-                policy_loss = self._get_policy_loss(rollout_data.obss, advantages, ratio, rollout_data.z_mpcs, rollout_data.z_cbfs, clip_range)
+                policy_loss = self._get_policy_loss(rollout_data.bc_index, rollout_data.standard_index, rollout_data.obss, advantages, ratio, rollout_data.z_mpcs, rollout_data.z_cbfs, clip_range)
                 value_loss = mse_loss(rollout_data.returns.flatten(), values.flatten())
                 entropy_loss = -torch.mean(entropys)
 
@@ -220,7 +221,8 @@ class PPO:
         
         for _ in range(self.config.evaluate_total_steps):
             action, _ = self.predict(obs, deterministic=True)
-            controller_result = self.controller_eval.control(action, last_done)
+            transed_action = self._trans_rl_to_control(action)
+            controller_result = self.controller_eval.control(transed_action, last_done)
             obs, reward, done, step_info = self.env_eval.step(controller_result.control_values_modified)
             
             total_reward += reward
@@ -234,10 +236,16 @@ class PPO:
         if is_render: self.render_class.generate_gif(evaluate_save_path)
         return total_reward
     
-    def _save(self, ckp_pth: str):
+    def _save(self, evaluate_reward: float, ckp_pth: str):
         # 保存checkpoint
-        torch.save(self.policy.state_dict(), ckp_pth)
-
+        data = dict(policy_state_dict = self.policy.state_dict(), metadata = dict(evaluate_reward = evaluate_reward), )
+        torch.save(data, ckp_pth)
+    
+    def _load(self, load_path: str) -> Dict:
+        data: Dict = torch.load(f=load_path)
+        self.policy.load_state_dict(data.get('policy_state_dict'))
+        return data.get('metadata')
+    
     def _render(self, text: Dict) -> ndarray:
         if 'step' in text: text['step'] = self.render_class.render_index
         return self.env_eval.render(**create_render_config(text = text))
@@ -246,11 +254,7 @@ class PPO:
         metadriveenv_config = self.config.metadriveenv_config
         return dict(traffic_mode = metadriveenv_config.traffic_mode, step = None)
     
-    def _get_policy_loss(self, obss: Tensor, advantages: Tensor, ratio: Tensor, z_mpcs: Tensor, z_cbfs: Tensor, clip_range: float) -> Tensor:
-        # create index
-        bc_index = torch.norm(z_cbfs - z_mpcs, p=1, dim=1) > self.config.delta_bc
-        standard_index = (bc_index == False)
-        
+    def _get_policy_loss(self, bc_index: Tensor, standard_index: Tensor, obss: Tensor, advantages: Tensor, ratio: Tensor, z_mpcs: Tensor, z_cbfs: Tensor, clip_range: float) -> Tensor:
         # caculate standard loss:
         if (~standard_index).all():
             standard_loss = 0.0
@@ -298,10 +302,20 @@ class PPO:
 
     def _update_remaining(self, num_step: int):
         self._remaining = 1.0 - float(num_step / self.config.total_steps)
-
     
     def _clip_range(self) -> float:
         return self.schedule(self._remaining)
+    
+    def _trans_rl_to_control(self, actions: ndarray) -> ndarray:
+        if len(actions.shape) == 1: actions = actions.reshape(1, -1) # 扩充维度
+        low, high = self.config.action_space_range # 剪裁动作到[-1, 1]之间
+        clipped_actions: ndarray = np.clip(actions, low, high)
+        
+        # 反归一化
+        new_actions = np.empty_like(actions)
+        new_actions[:, 0] = (clipped_actions[:, 0] + 1) / 2 * (self.config.v_max - self.config.v_min) + self.config.v_min
+        new_actions[:, 1] = (clipped_actions[:, 1] + 1) / 2 * (self.config.theta_max - self.config.theta_min) + self.config.theta_min
+        return new_actions
     
     def _create_logger(self):
         self.logger: Logger = Logger(self.config.logger_config)

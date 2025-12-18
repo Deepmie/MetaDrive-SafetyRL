@@ -2,6 +2,7 @@ import sys
 sys.path.append('/workspace/metadrive-github/')
 from metadrive.custom2_version2.base_config import PPOConfig
 from metadrive.custom2_version2.ppo import PPO
+from metadrive.custom2_version2.utils import set_random_seed
 import argparse
 
 if __name__ == '__main__':
@@ -10,6 +11,7 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
+    # set_random_seed(20)
     ppo_config = PPOConfig()
     ppo = PPO(ppo_config, eval_mode=True)
 
@@ -20,6 +22,7 @@ if __name__ == '__main__':
     else:
         raise TypeError(f'Arg `type` must in [newest, best], but you give {args.type} not in list.')
     
-    ppo.load_weight_from_checkpoint(ckpt_path)
+    metadata = ppo.load_weight_from_checkpoint(ckpt_path)
+    print(f'metadata: \n{metadata}')
     ppo.final_eval()
     ppo.close()

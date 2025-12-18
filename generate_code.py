@@ -28,13 +28,17 @@ def build_project_files(project_file_name: str = './metadrive_project'):
     transfer_root = os.path.join(WORKSPACE_DIR, project_file_name)
     print('prepare tansfer files...')
     time.sleep(0.5)
-    os.chdir('./dp_single_version2')
-    transfer_files('main.py', transfer_root=transfer_root)
+    # os.chdir('./dp_single_version2')
+    # transfer_files('main.py', transfer_root=transfer_root)
+    # os.chdir('../')
+    
+    # os.chdir('./metadrive/')
+    # transfer_files('custom2_version2', transfer_root=transfer_root)
+    # os.chdir('../')
+    os.chdir('./metadrive/custom2_version2/')
+    transfer_files('ocp', transfer_root=transfer_root)
     os.chdir('../')
     
-    os.chdir('./metadrive/')
-    transfer_files('custom2_version2', transfer_root=transfer_root)
-    os.chdir('../')
     print('transfer finished!, now skip back...')
     if not os.path.samefile(os.getcwd(), WORKSPACE_DIR): os.chdir(WORKSPACE_DIR)
 

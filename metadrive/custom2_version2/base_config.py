@@ -3,10 +3,10 @@ import numpy as np
 import torch
 from torch.nn import Module, Tanh
 from numpy import ndarray
-from typing import Dict, Optional
+from typing import Dict, Optional, Tuple
 from metadrive.custom2_version2.type import ActionType
 
-TEST_MODE            = True
+TEST_MODE            = False
 STATE_DIM            = 259
 ACTION_DIM           = 2
 TORCH_DTYPE          = torch.float32
@@ -21,9 +21,10 @@ IS_LOAD              = False
 # Paper Param:
 GAMMA                = 0.99
 LEARNING_RATE        = 3e-4
-EPOCH                = 25
+DELTA_BC             = 1.0
+EPOCH                = 20
 # MAX_BUFFER_SIZE  = 4096 if not TEST_MODE else 256
-MAX_BUFFER_SIZE      = 6600    if not TEST_MODE else 256
+MAX_BUFFER_SIZE      = 4096    if not TEST_MODE else 10
 BATCH_SIZE           = 64
 EVALUATE_STEPS       = 100000  if not TEST_MODE else 10
 EVALUATE_TOTAL_STEPS = 2000
@@ -40,7 +41,7 @@ class EnvConfig:
 @dataclass
 class MetaDriveEnvConfig:
     map: str                      = 'O'        # 地图形状
-    traffic_density: float        = 0.3        # 交通状况
+    traffic_density: float        = 0.2        # 交通状况
     # 交通模式, option: trigger, respawn, hybrid, basic
     traffic_mode: str             = 'respawn'
     horizon: int                  = 1000       # ego存活序列数
@@ -92,6 +93,7 @@ class RolloutBufferConfig:
     action_dim: int      = ACTION_DIM
     high_state_dim: int  = 2
     batch_size: int      = BATCH_SIZE
+    delta_bc: float      = DELTA_BC
     device: torch.device = TORCH_DEVICE
     max_buffer_size: int = MAX_BUFFER_SIZE
     gamma: float         = GAMMA           # 计算优势函数的参数之一
@@ -104,6 +106,7 @@ class ControllerConfig:
     n_process: int         = N_PROCESS
     control_dim: int       = 2
     vehicle_state_dim: int = 4
+    filter_num: int        = 5
 
 @dataclass
 class LoggerConfig:
@@ -137,12 +140,17 @@ class PPOConfig:
     value_loss_coef: float           = 0.5
     learning_rate: float             = 3e-4
     max_grad_norm: float             = 0.5
+    action_space_range: Tuple        = (-1, 1)
+    v_min: float                     = 0.0
+    v_max: float                     = 15.0
+    theta_min: float                 = -np.pi / 3
+    theta_max: float                 =  np.pi / 3
     update_freq: int                 = UPDATE_FREQ       # 经过多少步才更新
     target_kl: Optional[float]       = None
     evaluate_steps: int              = EVALUATE_STEPS
     evaluate_total_steps: int        = EVALUATE_TOTAL_STEPS
     is_load: bool                    = IS_LOAD
-    delta_bc: float                  = 1.0
+    delta_bc: float                  = DELTA_BC
     logger_save_root: str            = 'dp_single_version2/logger'
     policy_checkpoint_pth: str       = 'dp_single_version2/ckp_pth/policy.pth'
     best_policy_checkpoint_pth: str  = 'dp_single_version2/ckp_pth/best_policy.pth'

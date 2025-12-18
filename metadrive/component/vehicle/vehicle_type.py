@@ -8,7 +8,7 @@ from metadrive.constants import Semantics
 from metadrive.engine.asset_loader import AssetLoader
 from metadrive.customs.vehicle import SolverVehicle
 from metadrive.customs_parallel.vehicle import SolverVehicle as SolverVehicleParallel
-from metadrive.custom2_version2.vehicle import DpVehicle
+# from metadrive.custom2_version2.vehicle import DpVehicle
 
 
 # When using DefaultVehicle as traffic, please use this class.
@@ -417,7 +417,7 @@ vehicle_type = {
     "traffic_default": TrafficDefaultVehicle,
     "with_solver": SolverVehicle,
     "with_solver_parallel": SolverVehicleParallel,
-    "dp_vehicle": DpVehicle,
+    # "dp_vehicle": DpVehicle,
 }
 
 vehicle_class_to_type = inv_map = {v: k for k, v in vehicle_type.items()}

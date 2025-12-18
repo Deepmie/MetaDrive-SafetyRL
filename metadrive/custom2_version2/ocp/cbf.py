@@ -1,6 +1,6 @@
 from metadrive.custom2_version2.ocp.config import CBFconfig
 from metadrive.custom2_version2.ocp.base import OCP
-from typing import Dict, Tuple
+from typing import Dict, Tuple, cast
 import casadi as ca
 import numpy as np
 from numpy import ndarray
@@ -14,6 +14,7 @@ class CBF(OCP):
         self.lf = metadata.get('lf', None)
         self.lr = metadata.get('lr', None)
         super(CBF, self).__init__(config, metadata)
+        self.config = cast(CBFconfig, self.config)
     
     def __call__(self, x0, u0, mask, info):
         res: Dict = super(CBF, self).__call__(x0, u0, mask, info)
@@ -88,7 +89,7 @@ class CBF(OCP):
             'du_dim': DU.shape[0],
             'x_dim' : X.shape[0],
             'g_equal_dim' : self.config.nx + self.config.nu + self.config.nx,
-            'g_unequal_dim_1': self.config.N,
+            'g_unequal_dim_1': self.config.filter_num,
         }
 
     def _define_state_update_equation(self):
@@ -116,11 +117,12 @@ class CBF(OCP):
             pk: 当前时刻ego的位置信息, 应该是2维;
             pk_next: 下一时刻ego的位置信息, 应该是2维;
         '''
-        mask = ca.MX.sym('mask', self.config.N)
-        info = ca.MX.sym('info', self.config.N * self.config.info_dim)
+        N: int = self.config.filter_num
+        mask = ca.MX.sym('mask', N)
+        info = ca.MX.sym('info', N * self.config.info_dim)
         h = lambda pk, pk_s: ca.sqrt(ca.sumsqr(pk - pk_s) + 1e-6) - self.config.dist_min
 
-        for i in range(self.config.N):
+        for i in range(N):
             pk_s = info[i * self.config.info_dim: (i+1) * self.config.info_dim]
             self._g.append(ca.if_else(
                 mask[i] > 0, mask[i] * (h(pk_next, pk_s) - (1 + self.config.gamma) * h(pk, pk_s)), 0
@@ -144,5 +146,4 @@ class CBF(OCP):
         du: ndarray = w[self._nlp_metadata['u_dim']: self._nlp_metadata['u_dim']+self._nlp_metadata['du_dim']].reshape(1, self.config.nu)
         x: ndarray  = w[self._nlp_metadata['u_dim']+self._nlp_metadata['du_dim']::].reshape(2, self.config.nx)
         solve_info = self._get_stats()
-        self._last_w = w
         return u, du, x, solve_info

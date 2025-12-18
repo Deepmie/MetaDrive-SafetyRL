@@ -3,7 +3,7 @@ from typing import Union, List, Tuple, Dict, Optional
 from datetime import datetime
 import os
 import importlib
-from dataclasses import dataclass
+from dataclasses import dataclass, asdict
 import time
 
 @dataclass
@@ -24,8 +24,10 @@ CONFIG_DICT = {
     'ocp.config.MPConfig': [
         'np', 'mu', 'a_min', 'a_max',
         'delta_min', 'delta_max',
-    ]
-
+    ],
+    'ocp.config.OptimConfig': [
+        'ipopt', 'print_time'
+    ],
 }
 
 class Logger:
@@ -53,7 +55,10 @@ class Logger:
         for idx, (config_name, single_config_dict) in enumerate(config_dict.items()):
             self._write(self._get_line_string_with_name(config_name))
             for jdx, (attr_name, attr_value) in enumerate(single_config_dict.items()):
-                self._write(self._get_attr_table_string(attr_name, attr_value))
+                if isinstance(attr_value, Dict):
+                    self._write(self._get_dictattr_table_string(attr_name, attr_value))
+                else:
+                    self._write(self._get_attr_table_string(attr_name, attr_value))
                 if jdx < len(single_config_dict)-1: self._write(self._get_line_string())
         
         self._last_write_pos = self._tell()
@@ -141,6 +146,17 @@ class Logger:
         attr_value_string: str = self._process_attr_value(attr_value, attr_name)
         attr_value_end_string = self._generate_end_string(attr_value_string, self.config.max_value_length, SYMBOL.space)
         return f'|{attr_name_end_string}|{attr_value_end_string}|\n'
+    
+    def _get_dictattr_table_string(self, attr_name: str, attr_value: Dict) -> str:
+        attr_table_string: str = self._get_attr_table_string(attr_name, ' ')
+        for idx, (key, value) in enumerate(attr_value.items()):
+            sub_attr_name = f'{key}'
+            if isinstance(value, Dict):
+                attr_table_string += self._get_dictattr_table_string(sub_attr_name, value)
+            else:
+                attr_table_string += self._get_attr_table_string(sub_attr_name, value)
+            # if idx != len(attr_value) - 1: attr_table_string += self._get_line_string()
+        return attr_table_string
 
     def _get_config_modules_dynamic(self) -> Dict[str, Dict]:
         config_dict = dict()
@@ -156,15 +172,19 @@ class Logger:
 
             single_config_dict = dict()
             config_cls = getattr(module, config_name)
+            config_cls_dict = asdict(config_cls()) # 实例化一下
             
             for attr_name in value:
-                if not hasattr(config_cls, attr_name):
-                    raise NameError(f'{attr_name} not Founded in {config_name}.')
-                attr_value = getattr(config_cls, attr_name)
+                # if not hasattr(config_cls, attr_name):
+                #     raise NameError(f'{attr_name} not Founded in {config_name}.')
+                # attr_value = getattr(config_cls, attr_name)
+                if attr_name not in config_cls_dict:
+                    raise NameError(f'{attr_name} not Founded in {config_name}')
+                attr_value = config_cls_dict.get(attr_name)
                 single_config_dict[attr_name] = attr_value # 赋值
             config_dict[config_name] = single_config_dict
         return config_dict
-
+    
     def _generate_end_string(self, s: str, max_length: int, symbol: str) -> str:
         res_length = max_length - len(s)
         split_string = (res_length // 2, res_length // 2 + int(res_length % 2 != 0))

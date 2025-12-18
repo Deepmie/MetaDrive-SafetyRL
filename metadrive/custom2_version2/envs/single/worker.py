@@ -1,6 +1,7 @@
 from metadrive.custom2_version2.envs.utils import CloudpickleWrapper, Commond
 from metadrive.component.vehicle.default_vehicle import DefaultVehicle
 from metadrive.component.vehicle.base_vehicle import BaseVehicle
+from metadrive.custom2_version2.utils import set_random_seed
 from metadrive.base_class.base_object import BaseObject
 from metadrive.custom2_version2.ocp import CBFconfig
 from metadrive import MetaDriveEnv
@@ -35,7 +36,7 @@ class Worker:
         return obs, reward, done, step_info, reset_info
     
     def reset(self) -> Tuple:
-        # set_random_seed(42 * (self.env_idx + 1))
+        set_random_seed(0) # 重置随机数
         obs, reset_info = self.env.reset()
         return obs, reset_info
     

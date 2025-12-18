@@ -18,18 +18,22 @@ class RolloutBatchData:
     returns: Tensor
     z_mpcs: Tensor
     z_cbfs: Tensor
+    bc_index: Tensor
+    standard_index: Tensor
     
     def move_to_device(self, device: torch.device):
-        self.obss          = self.obss.to(device)
-        self.actions       = self.actions.to(device)
-        self.rewards       = self.rewards.to(device)
-        self.dones         = self.dones.to(device)
-        self.old_log_probs = self.old_log_probs.to(device)
-        self.old_values    = self.old_values.to(device)
-        self.advantages    = self.advantages.to(device)
-        self.returns       = self.returns.to(device)
-        self.z_mpcs        = self.z_mpcs.to(device)
-        self.z_cbfs        = self.z_cbfs.to(device)
+        self.obss           = self.obss.to(device)
+        self.actions        = self.actions.to(device)
+        self.rewards        = self.rewards.to(device)
+        self.dones          = self.dones.to(device)
+        self.old_log_probs  = self.old_log_probs.to(device)
+        self.old_values     = self.old_values.to(device)
+        self.advantages     = self.advantages.to(device)
+        self.returns        = self.returns.to(device)
+        self.z_mpcs         = self.z_mpcs.to(device)
+        self.z_cbfs         = self.z_cbfs.to(device)
+        self.bc_index       = self.bc_index.to(device)
+        self.standard_index = self.standard_index.to(device)
 
 
 class RolloutBuffer:
@@ -83,7 +87,6 @@ class RolloutBuffer:
         
         self.advantages: Tensor = self._init_tensor(self.config.max_buffer_size, dtype=torch.float32)                               # 1d vector
         self.returns: Tensor    = self._init_tensor(self.config.max_buffer_size, dtype=torch.float32)                               # 1d vector
-        
 
         # ============other data========== #
         self._idx = 0
@@ -106,30 +109,37 @@ class RolloutBuffer:
             start_idx += self.config.batch_size
             yield \
             RolloutBatchData(
-                obss          = self.states[indice],
-                actions       = self.actions[indice],
-                rewards       = self.rewards[indice].flatten(),
-                dones         = self.dones[indice].flatten(),
-                old_log_probs = self.log_probs[indice].flatten(),
-                old_values    = self.values[indice].flatten(),
-                advantages    = self.advantages[indice].flatten(),
-                returns       = self.returns[indice].flatten(),
-                z_mpcs        = self.z_mpcs[indice],
-                z_cbfs        = self.z_cbfs[indice],
+                obss           = self.states[indice],
+                actions        = self.actions[indice],
+                rewards        = self.rewards[indice].flatten(),
+                dones          = self.dones[indice].flatten(),
+                old_log_probs  = self.log_probs[indice].flatten(),
+                old_values     = self.values[indice].flatten(),
+                advantages     = self.advantages[indice].flatten(),
+                returns        = self.returns[indice].flatten(),
+                z_mpcs         = self.z_mpcs[indice],
+                z_cbfs         = self.z_cbfs[indice],
+                bc_index       = self.bc_index[indice],
+                standard_index = self.standard_index[indice],
             )
 
     def _flatten_tensor(self):
-        self.states        = self._flatten(self.states)
-        self.actions       = self._flatten(self.actions)
-        self.rewards       = self._flatten(self.rewards)
-        self.dones         = self._flatten(self.dones)
-        self.log_probs     = self._flatten(self.log_probs)
-        self.values        = self._flatten(self.values)
-        self.advantages    = self._flatten(self.advantages)
-        self.returns       = self._flatten(self.returns)
-        self.z_mpcs        = self._flatten(self.z_mpcs)
-        self.z_cbfs        = self._flatten(self.z_cbfs)
-
+        self.states      = self._flatten(self.states)
+        self.actions     = self._flatten(self.actions)
+        self.rewards     = self._flatten(self.rewards)
+        self.dones       = self._flatten(self.dones)
+        self.log_probs   = self._flatten(self.log_probs)
+        self.values      = self._flatten(self.values)
+        self.advantages  = self._flatten(self.advantages)
+        self.returns     = self._flatten(self.returns)
+        self.z_mpcs      = self._flatten(self.z_mpcs)
+        self.z_cbfs      = self._flatten(self.z_cbfs)
+        self._get_bc_index()   # 计算bc_index
+    
+    def _get_bc_index(self):
+        self.bc_index = torch.norm(self.z_cbfs - self.z_mpcs, p=1, dim=1) > self.config.delta_bc
+        self.standard_index = (self.bc_index == False)
+    
     def _flatten(self, t: Tensor): # t.shape = 2 or 3
         if len(t.shape) < 3:
             t = t.unsqueeze(dim=-1)

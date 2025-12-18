@@ -131,5 +131,4 @@ class MPC(OCP):
         u: ndarray = w[0: self._nlp_metadata['u_dim']].reshape(self.config.mu, self.config.nu)
         x: ndarray = w[self._nlp_metadata['u_dim']::].reshape(self.config.np + 1, self.config.nx)
         solve_info = self._get_stats()
-        self._last_w = w
         return u, x, solve_info

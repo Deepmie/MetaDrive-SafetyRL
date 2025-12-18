@@ -89,7 +89,7 @@ class ParallelEnv:
         for meta_process in self.meta_processs:
             info, mask = meta_process.par_remotes.recv()
             info = cast(ndarray, info); mask = cast(ndarray, mask)
-            infos.append(info.flatten()); masks.append(mask)
+            infos.append(info); masks.append(mask)
         return infos, masks
 
     def close(self):

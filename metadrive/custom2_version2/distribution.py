@@ -107,9 +107,9 @@ class DiagGaussianDistribution(Distribution):
         self.log_std = None
     
     def proba_distribution_net(self, latent_dim: int, log_std_init: float = 0.0) -> nn.Module:
-        mean_action = nn.Linear(latent_dim, self.action_dim)
+        action_net = nn.Linear(latent_dim, self.action_dim)
         log_std = nn.Parameter(torch.ones(self.action_dim) * log_std_init, requires_grad=True)
-        return mean_action, log_std
+        return action_net, log_std
     
     def proba_distribution(self, mean_action: Tensor, log_std: Tensor) -> nn.Module:
         action_std = torch.ones_like(mean_action) * log_std.exp()
