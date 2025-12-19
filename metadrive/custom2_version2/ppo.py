@@ -88,11 +88,11 @@ class PPO:
 
             if self.num_steps >= (evaluate_idx + 1) * self.config.evaluate_steps:
                 print('\nstart to evaluate & save...')
-                reward_eval = self._evaluate()
-                self.logger.write_reward(reward_eval)
+                evaluate_reward = self._evaluate()
+                self.logger.write_reward(evaluate_reward)
                 evaluate_idx += 1
-                self._save(ckp_pth=self.config.policy_checkpoint_pth)
-                if reward_eval > best_reward: self._save(ckp_pth=self.config.best_policy_checkpoint_pth); best_reward = reward_eval
+                self._save(evaluate_reward=evaluate_reward, ckp_pth=self.config.policy_checkpoint_pth)
+                if evaluate_reward > best_reward: self._save(ckp_pth=self.config.best_policy_checkpoint_pth); best_reward = evaluate_reward
         
         self._start_successful = True
         start_info = 'Successful!'
