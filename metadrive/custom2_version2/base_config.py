@@ -6,7 +6,7 @@ from numpy import ndarray
 from typing import Dict, Optional, Tuple
 from metadrive.custom2_version2.type import ActionType
 
-TEST_MODE            = False
+TEST_MODE            = True
 STATE_DIM            = 259
 ACTION_DIM           = 2
 TORCH_DTYPE          = torch.float32
@@ -24,11 +24,11 @@ LEARNING_RATE        = 3e-4
 DELTA_BC             = 1.0
 EPOCH                = 20
 # MAX_BUFFER_SIZE  = 4096 if not TEST_MODE else 256
-MAX_BUFFER_SIZE      = 4096    if not TEST_MODE else 10
+MAX_BUFFER_SIZE      = 4096    if not TEST_MODE else 256
 BATCH_SIZE           = 64
-EVALUATE_STEPS       = 100000  if not TEST_MODE else 10
+EVALUATE_STEPS       = 20000  if not TEST_MODE else 50
 EVALUATE_TOTAL_STEPS = 2000
-TOTAL_STEPS          = 2000000 if not TEST_MODE else 1000
+TOTAL_STEPS          = 2000000 if not TEST_MODE else 9000
 
 
 @dataclass
@@ -43,7 +43,7 @@ class MetaDriveEnvConfig:
     map: str                      = 'O'        # 地图形状
     traffic_density: float        = 0.2        # 交通状况
     # 交通模式, option: trigger, respawn, hybrid, basic
-    traffic_mode: str             = 'respawn'
+    traffic_mode: str             = 'respawn'  # 
     horizon: int                  = 1000       # ego存活序列数
     random_spawn_lane_index: bool = False      # 车辆是否随机生成在某个车道上
     num_scenarios: int            = 1          # 场景的数量

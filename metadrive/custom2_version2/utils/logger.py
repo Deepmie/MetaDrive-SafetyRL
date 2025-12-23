@@ -2,6 +2,7 @@ from metadrive.custom2_version2.base_config import LoggerConfig
 from typing import Union, List, Tuple, Dict, Optional
 from datetime import datetime
 import os
+from _io import TextIOWrapper
 import importlib
 from dataclasses import dataclass, asdict
 import time
@@ -34,19 +35,32 @@ class Logger:
     def __init__(self, config: LoggerConfig):
         self.config = config
         self.now_datetime = datetime.now()
-        self.logger_path = os.path.join(config.logger_path_root, 'log_{}.txt'.format(self.now_datetime.strftime("%Y_%m_%d_%H_%M_%S")))
-        self.logger_file = open(self.logger_path, mode='w', encoding='utf-8')
+        
+        # =================日志路径名================= #
+        logger_path: str           = os.path.join(config.logger_path_root, 'log_{}'.format(self.now_datetime.strftime("%Y_%m_%d_%H_%M_%S")))
+        record_path: str           = os.path.join(logger_path, 'record.txt')
+        cbf_ratio_record_path: str = os.path.join(logger_path, 'cbf_ratio.txt')
+        # ========================================== #
+        
+        os.mkdir(logger_path) # 创建文件夹
+        self.record_file = open(record_path, mode='w', encoding='utf-8')
+        self.ratio_record_file = open(cbf_ratio_record_path, mode='w', encoding='utf-8')
+
+        # =================其他变量=================== #
         self._is_first_write_reward: bool = True
         self._is_first_write_addparam: bool = True
         self._reward_index: int = 0
+        self._cbf_ratio_record_index: int = 0
         self._last_write_pos: Optional[int] = None
+        # ========================================== #
         self.write_init()
     
     def close(self):
-        self.logger_file.close()
+        self.record_file.close()
     
     def write_init(self):
         self._write(f'Write in {self.now_datetime.strftime("%Y.%m.%d %H: %M: %S")}\n')
+        self._write(f'Start to record CBF use ratio, in {self.now_datetime.strftime("%Y.%m.%d %H: %M: %S")}\n')
         self.write_table()
     
     def write_table(self):
@@ -104,17 +118,32 @@ class Logger:
             self._write(f'{time_value: .4f}{time_unit_string}')
             if idx < len(time_result)-1: self._write(' ') 
         self._write('\n')
+    
+    def write_cbf_ratio(self, r: float):
+        if r < 1e-5: r = 0.0 # 过小直接置为0
+        self._write(f'{self._cbf_ratio_record_index}: {r * 100 : .4f}%\n', file_name='ratio_record')
 
-    def _write(self, s: str):
-        self.logger_file.write(s)
-        self.logger_file.flush()
+    def _get_file(self, file_name: str = 'record') -> TextIOWrapper:
+        file_name_real: str = f'{file_name}_file'
+        if hasattr(self, file_name_real):
+            _file: TextIOWrapper = getattr(self, file_name_real)
+        else:
+            raise NameError(f'attr `file_name` must include in [record, ratio_record], but you give: {file_name}')
+        return _file
 
-    def _seek(self, pos: int):
-        self.logger_file.seek(pos)
-        self.logger_file.truncate()
+    def _write(self, s: str, file_name: str = 'record'):
+        _write_file = self._get_file(file_name)
+        _write_file.write(s)
+        _write_file.flush()
 
-    def _tell(self) -> int:
-        return self.logger_file.tell()
+    def _seek(self, pos: int, file_name: str = 'record'):
+        _seek_file = self._get_file(file_name)
+        _seek_file.seek(pos)
+        _seek_file.truncate()
+
+    def _tell(self, file_name: str = 'record') -> int:
+        _tell_file = self._get_file(file_name)
+        return _tell_file.tell()
     
     def _write_reward_init(self):
         self._write('\nRewards: \n')
@@ -190,9 +219,9 @@ class Logger:
         split_string = (res_length // 2, res_length // 2 + int(res_length % 2 != 0))
         return f'{split_string[0] * symbol}{s}{split_string[1] * symbol}'
 
-    def _process_attr_value(self, value: Union[List, Dict, Tuple, float, int, str, ], name: str) -> str:
+    def _process_attr_value(self, value: Union[List, Dict, Tuple, float, int, str, ], name: str, num: int = 4) -> str:
         if isinstance(value, float):
-            return f'{value :.4}'
+            return f'{round(value, num)}'
         elif isinstance(value, (int, List, Dict, Tuple, )):
             return str(value)
         elif isinstance(value, str):

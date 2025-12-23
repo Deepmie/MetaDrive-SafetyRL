@@ -25,6 +25,7 @@ class Worker:
         self.env: MetaDriveEnv = env_wrapper.env() # 获取环境
         self.env_idx = env_idx
         self.running = False
+        self.seed: int = 0
         self.func_names: Dict[str, Callable] = {func_name: getattr(self, func_name) for func_name in dir(self) if not func_name.startswith('_')}
         self.cbf_config = CBFconfig()
 
@@ -36,7 +37,7 @@ class Worker:
         return obs, reward, done, step_info, reset_info
     
     def reset(self) -> Tuple:
-        set_random_seed(0) # 重置随机数
+        set_random_seed(self.seed) # 重置随机数
         obs, reset_info = self.env.reset()
         return obs, reset_info
     

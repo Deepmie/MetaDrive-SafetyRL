@@ -26,28 +26,28 @@ class PPO:
         self.config = config
         self.now_datetime = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
         self.final_evaluate_path = f'{self.config.evaluate_save_root}/demo_{self.now_datetime}.gif'
+        self.eval_mode = eval_mode
 
         self.env: ParallelEnv = ParallelEnv(
             [partial(create_env, config.metadriveenv_config) for _ in range(self.config.parallel_env_config.n_process)],
             self.config.parallel_env_config,
         )
-        self.env_eval: SingleEnv = SingleEnv(
-            partial(create_env, config.metadriveenv_config),
-            self.config.parallel_env_config,
-        )
+        # self.env_eval: SingleEnv = SingleEnv(
+        #     partial(create_env, config.metadriveenv_config),
+        #     self.config.parallel_env_config,
+        # )
+        self._create_logger()
         
         self.policy: Policy = Policy(self.config.policy_config)
-        self.buffer: RolloutBuffer = RolloutBuffer(self.config.buffer_config)
+        self.buffer: RolloutBuffer = RolloutBuffer(self.config.buffer_config, logger=self.logger)
         self._last_obss  = self.env.reset() # 初始化第一次的env
-        self.env_eval.reset()
+        # self.env_eval.reset()
         
         self.controller: Controller      = Controller(self.env, self.config.controller_config, eval_mode=False)
-        self.controller_eval: Controller = Controller(self.env_eval, self.config.controller_config, eval_mode=True)
         self.timer: Timer                = Timer()
         self.render_class: RenderClass   = RenderClass()
         
-        if not eval_mode:
-            self._create_logger()
+
         
         self.schedule    = ConstantSchedule(self.config.epsilon)
 
@@ -70,11 +70,10 @@ class PPO:
     
     def _start(self) -> Tuple[bool, str]:
         # try:
-        self.policy.train()
         pbar = tqdm(total=self.config.total_steps, desc='total')
-        iterations = 0
+        iterations   = 0
         evaluate_idx = 0
-        best_reward = -float('inf')
+        best_reward  = -float('inf')
         while self.num_steps < self.config.total_steps:
             print('\nstart to sample...')
             self._sample()
@@ -89,10 +88,11 @@ class PPO:
             if self.num_steps >= (evaluate_idx + 1) * self.config.evaluate_steps:
                 print('\nstart to evaluate & save...')
                 evaluate_reward = self._evaluate()
-                self.logger.write_reward(evaluate_reward)
+                if evaluate_reward > best_reward: self._save(evaluate_reward=evaluate_reward, ckp_pth=self.config.best_policy_checkpoint_pth); best_reward = evaluate_reward
+                self.logger.write_reward(evaluate_reward, best_reward=best_reward)
                 evaluate_idx += 1
+
                 self._save(evaluate_reward=evaluate_reward, ckp_pth=self.config.policy_checkpoint_pth)
-                if evaluate_reward > best_reward: self._save(ckp_pth=self.config.best_policy_checkpoint_pth); best_reward = evaluate_reward
         
         self._start_successful = True
         start_info = 'Successful!'
@@ -115,7 +115,7 @@ class PPO:
     
     def close(self):
         self.env.close()
-        self.env_eval.close()
+        # self.env_eval.close()
         if hasattr(self, 'logger'): self.logger.close()
 
     def load_weight_from_checkpoint(self, load_path: Optional[str] = None) -> Dict:
@@ -161,6 +161,7 @@ class PPO:
         pbar.close()
     
     def _train(self):
+        self.policy.train()
         total_sample_steps = self.config.sample_steps * self.config.n_process
         pbar = tqdm(total=self.config.epoch * (total_sample_steps // self.config.batch_size + int(total_sample_steps % self.config.batch_size != 0)), desc='train')
         clip_range = self._clip_range()
@@ -214,7 +215,16 @@ class PPO:
 
     def _evaluate(self, is_render: bool = False, evaluate_save_path: str = '') -> Tuple:
         self.policy.eval()
-        obs = self.env_eval.reset()
+        # 创建一个新的环境
+        env_eval: SingleEnv = SingleEnv(
+            partial(create_env, self.config.metadriveenv_config),
+            self.config.parallel_env_config,
+        )
+        obs = env_eval.reset()
+
+        # 创建一个新的控制器
+        controller_eval: Controller = Controller(env_eval, self.config.controller_config, eval_mode=True)
+
         last_done = np.ones(shape=[1, ])
         total_reward = 0.0
         if is_render: render_row_text = self._create_render_text()
@@ -222,11 +232,11 @@ class PPO:
         for _ in range(self.config.evaluate_total_steps):
             action, _ = self.predict(obs, deterministic=True)
             transed_action = self._trans_rl_to_control(action)
-            controller_result = self.controller_eval.control(transed_action, last_done)
-            obs, reward, done, step_info = self.env_eval.step(controller_result.control_values_modified)
+            controller_result = controller_eval.control(transed_action, last_done)
+            obs, reward, done, step_info = env_eval.step(controller_result.control_values_modified)
             
             total_reward += reward
-            if is_render: self.render_class.add_frame(self._render(render_row_text))
+            if is_render: self.render_class.add_frame(self._render(render_row_text, env_eval))
             
             if done:
                 break
@@ -234,6 +244,9 @@ class PPO:
             last_done = np.array([done], dtype=np.long)
         
         if is_render: self.render_class.generate_gif(evaluate_save_path)
+        # 清除用于评估的环境
+        env_eval.close()
+        del env_eval
         return total_reward
     
     def _save(self, evaluate_reward: float, ckp_pth: str):
@@ -246,9 +259,9 @@ class PPO:
         self.policy.load_state_dict(data.get('policy_state_dict'))
         return data.get('metadata')
     
-    def _render(self, text: Dict) -> ndarray:
+    def _render(self, text: Dict, env: SingleEnv) -> ndarray:
         if 'step' in text: text['step'] = self.render_class.render_index
-        return self.env_eval.render(**create_render_config(text = text))
+        return env.render(**create_render_config(text = text))
     
     def _create_render_text(self) -> Dict:
         metadriveenv_config = self.config.metadriveenv_config
@@ -289,7 +302,7 @@ class PPO:
                     terminal_value = self.policy.predict_value(step_infos[idx].get('terminal_observation'))
                     terminal_value: ndarray = converto_ndarray(terminal_value)
                 rewards[idx] += self.config.buffer_config.gamma * terminal_value
-            return rewards
+        return rewards
     
     def _early_stop(self, log_prob: Tensor, old_log_probs: RolloutBatchData) -> bool:
         with torch.no_grad():
@@ -318,10 +331,13 @@ class PPO:
         return new_actions
     
     def _create_logger(self):
-        self.logger: Logger = Logger(self.config.logger_config)
+        if not self.eval_mode:
+            self.logger: Logger = Logger(self.config.logger_config)
 
-        if hasattr(self, 'final_evaluate_path'):
-            self.logger.write_tabel_additional_params(['final_evaluate_path'], [os.path.basename(self.final_evaluate_path)])
+            if hasattr(self, 'final_evaluate_path'):
+                self.logger.write_tabel_additional_params(['final_evaluate_path'], [os.path.basename(self.final_evaluate_path)])
+        else:
+            self.logger = None
 
 
 

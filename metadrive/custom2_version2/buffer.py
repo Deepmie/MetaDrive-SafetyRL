@@ -1,4 +1,5 @@
 from metadrive.custom2_version2.base_config import RolloutBufferConfig
+from metadrive.custom2_version2.utils.logger import Logger
 from dataclasses import dataclass
 import numpy as np
 import torch
@@ -37,8 +38,10 @@ class RolloutBatchData:
 
 
 class RolloutBuffer:
-    def __init__(self, config: RolloutBufferConfig):
+    def __init__(self, config: RolloutBufferConfig, logger: Optional[Logger]):
         self.config = config
+        if logger is not None:
+            self.logger = logger
         self.reset()
     
     def push(self, states: ndarray, actions: ndarray, rewards: ndarray, dones: ndarray, log_probs: Tensor, values: Tensor, z_mpcs: ndarray, z_cbfs: ndarray):
@@ -139,6 +142,10 @@ class RolloutBuffer:
     def _get_bc_index(self):
         self.bc_index = torch.norm(self.z_cbfs - self.z_mpcs, p=1, dim=1) > self.config.delta_bc
         self.standard_index = (self.bc_index == False)
+        
+        if self.logger is not None: # 如果不是None, 则记录ratio
+            ratio: float = self.bc_index.sum().item() / self.bc_index.shape[0]
+            self.logger.write_cbf_ratio(r = ratio)
     
     def _flatten(self, t: Tensor): # t.shape = 2 or 3
         if len(t.shape) < 3:

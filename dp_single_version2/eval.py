@@ -11,10 +11,10 @@ if __name__ == '__main__':
 
     args = parser.parse_args()
 
-    # set_random_seed(20)
+    set_random_seed(0)
     ppo_config = PPOConfig()
     ppo = PPO(ppo_config, eval_mode=True)
-
+    
     if args.type == 'newest':
         ckpt_path = ppo_config.policy_checkpoint_pth
     elif args.type == 'best':
