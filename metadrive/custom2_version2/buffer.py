@@ -140,12 +140,17 @@ class RolloutBuffer:
         self._get_bc_index()   # 计算bc_index
     
     def _get_bc_index(self):
-        self.bc_index = torch.norm(self.z_cbfs - self.z_mpcs, p=1, dim=1) > self.config.delta_bc
+        cbf_mpc_delta = torch.norm(self.z_cbfs - self.z_mpcs, p=1, dim=1)
+        self.bc_index = cbf_mpc_delta > self.config.delta_bc
         self.standard_index = (self.bc_index == False)
         
         if self.logger is not None: # 如果不是None, 则记录ratio
             ratio: float = self.bc_index.sum().item() / self.bc_index.shape[0]
-            self.logger.write_cbf_ratio(r = ratio)
+            metadata = dict(
+                max  = cbf_mpc_delta.max().item(), min  = cbf_mpc_delta.min().item(),
+                mean = cbf_mpc_delta.mean().item(),
+            )
+            self.logger.write_cbf_ratio(r = ratio, metadata=metadata)
     
     def _flatten(self, t: Tensor): # t.shape = 2 or 3
         if len(t.shape) < 3:

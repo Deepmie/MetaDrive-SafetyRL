@@ -6,7 +6,7 @@ from numpy import ndarray
 from typing import Dict, Optional, Tuple
 from metadrive.custom2_version2.type import ActionType
 
-TEST_MODE            = True
+TEST_MODE            = False
 STATE_DIM            = 259
 ACTION_DIM           = 2
 TORCH_DTYPE          = torch.float32
@@ -21,7 +21,7 @@ IS_LOAD              = False
 # Paper Param:
 GAMMA                = 0.99
 LEARNING_RATE        = 3e-4
-DELTA_BC             = 1.0
+DELTA_BC             = 0.01
 EPOCH                = 20
 # MAX_BUFFER_SIZE  = 4096 if not TEST_MODE else 256
 MAX_BUFFER_SIZE      = 4096    if not TEST_MODE else 256

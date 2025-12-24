@@ -60,7 +60,7 @@ class Logger:
     
     def write_init(self):
         self._write(f'Write in {self.now_datetime.strftime("%Y.%m.%d %H: %M: %S")}\n')
-        self._write(f'Start to record CBF use ratio, in {self.now_datetime.strftime("%Y.%m.%d %H: %M: %S")}\n')
+        self._write(f'Start to record CBF use ratio, in {self.now_datetime.strftime("%Y.%m.%d %H: %M: %S")}\n\n', file_name='ratio_record')
         self.write_table()
     
     def write_table(self):
@@ -119,9 +119,10 @@ class Logger:
             if idx < len(time_result)-1: self._write(' ') 
         self._write('\n')
     
-    def write_cbf_ratio(self, r: float):
-        if r < 1e-5: r = 0.0 # 过小直接置为0
-        self._write(f'{self._cbf_ratio_record_index}: {r * 100 : .4f}%\n', file_name='ratio_record')
+    def write_cbf_ratio(self, r: float, metadata: Dict):
+        # if r < 1e-5: r = 0.0 # 过小直接置为0
+        self._write(f'{self._cbf_ratio_record_index}: {r * 100 : .4f}%, {metadata}\n', file_name='ratio_record')
+        self._cbf_ratio_record_index += 1
 
     def _get_file(self, file_name: str = 'record') -> TextIOWrapper:
         file_name_real: str = f'{file_name}_file'
