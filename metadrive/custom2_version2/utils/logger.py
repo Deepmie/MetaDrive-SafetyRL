@@ -121,9 +121,13 @@ class Logger:
     
     def write_cbf_ratio(self, r: float, metadata: Dict):
         # if r < 1e-5: r = 0.0 # 过小直接置为0
-        self._write(f'{self._cbf_ratio_record_index}: {r * 100 : .4f}%, {metadata}\n', file_name='ratio_record')
+        metadata_string: str = ''
+        for idx, (key, value) in enumerate(metadata.items()):
+            metadata_string += f'{key}: {value: .4e}'
+            if idx < len(metadata) - 1: metadata_string += ', '
+        self._write(f'{self._cbf_ratio_record_index}: {r * 100 : .4f}%, {metadata_string}\n', file_name='ratio_record')
         self._cbf_ratio_record_index += 1
-
+    
     def _get_file(self, file_name: str = 'record') -> TextIOWrapper:
         file_name_real: str = f'{file_name}_file'
         if hasattr(self, file_name_real):

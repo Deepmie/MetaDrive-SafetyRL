@@ -1,7 +1,9 @@
 from dataclasses import dataclass, field, asdict
 from numpy import pi
 from typing import Dict, cast
+from metadrive.component.vehicle.default_vehicle import DefaultVehicle
 
+VEHICLE_LENGTH = 4.515
 
 @dataclass
 class IpoptConfig:
@@ -57,11 +59,11 @@ class MPConfig(OCPconfig):
 
 @dataclass
 class CBFconfig(OCPconfig):
-    N: int           = 20        # 假设当前地图最多20辆车
-    info_dim: int    = 2         # 需要车辆的信息维度
-    dist_min: int    = 1.5       # 需要保持的最小安全距离
-    gamma: float     = -0.5      # cbf参数之一
-    filter_num: int  = 5         # 只取得前5辆车考虑
+    N: int           = 20                    # 假设当前地图最多20辆车
+    info_dim: int    = 3                     # 需要车辆的信息维度
+    dist_min: int    = 0.5                   # 需要保持的最小安全距离
+    gamma: float     = -0.5                  # cbf参数之一
+    filter_num: int  = 5                     # 只取得前5辆车考虑
 
 
 if __name__ == '__main__':

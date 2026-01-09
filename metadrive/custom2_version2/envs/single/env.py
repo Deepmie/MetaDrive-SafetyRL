@@ -4,7 +4,7 @@ from metadrive.custom2_version2.base_config import ParallelEnvConfig
 import multiprocessing as mp
 from multiprocessing.context import BaseContext
 from multiprocessing import Process
-from typing import Tuple, Dict, cast
+from typing import Tuple, Dict, List, cast
 from numpy import ndarray
 
 
@@ -57,6 +57,10 @@ class SingleEnv:
         info, mask = self.meta_process.par_remotes.recv()
         info = cast(ndarray, info); mask = cast(ndarray, mask)
         return info, mask
+
+    def generate_vehicle(self, pos: List):
+        self.meta_process.par_remotes.send(Commond(name='generate_vehicle', args=(pos, )))
+        return self.meta_process.par_remotes.recv()
     
     def close(self):
         if self.closed:

@@ -7,7 +7,7 @@ from metadrive.custom2_version2.ocp import CBFconfig
 from metadrive import MetaDriveEnv
 from multiprocessing.connection import Connection
 import traceback
-from typing import Dict, Callable, Any, Tuple, cast
+from typing import Dict, Callable, Any, Tuple, List, cast
 from numpy import ndarray
 import numpy as np
 
@@ -71,9 +71,16 @@ class Worker:
         mask = np.zeros([self.cbf_config.N, ])
         for idx, (oid, obj) in enumerate(self.env.engine.get_objects(filter=_filter_other_object).items()):
             obj = cast(BaseVehicle, obj)
-            info[idx, 0: 2] = obj.position
+            info[idx, 0: 2] = obj.position; info[idx, 2] = obj.heading_theta
             mask[idx] = 1
         return info, mask
+    
+    def generate_vehicle(self, pos: List):
+        engine = self.env.engine
+        vehicle_config = self.env.config['vehicle_config']
+        vehicle_config['navigation'] = None
+        engine.spawn_object(DefaultVehicle, vehicle_config=vehicle_config, position=pos, heading=0)
+        return None
     
     def close(self) -> str:
         self.env.close()

@@ -1,6 +1,7 @@
-from metadrive.custom2_version2.ocp.config import CBFconfig
+from metadrive.custom2_version2.ocp.config import CBFconfig, OptimConfig, IpoptConfig
 from metadrive.custom2_version2.ocp.base import OCP
-from typing import Dict, Tuple
+from metadrive.custom2_version2.ocp.cbf_func import CBFunctionsCasadi
+from typing import Dict, Tuple, cast
 import casadi as ca
 import numpy as np
 from numpy import ndarray
@@ -14,9 +15,14 @@ class CBF(OCP):
         self.lf = metadata.get('lf', None)
         self.lr = metadata.get('lr', None)
         super(CBF, self).__init__(config, metadata)
+        ipopt_config: IpoptConfig = IpoptConfig(print_level=0)
+        optim_config: OptimConfig = OptimConfig(ipopt=ipopt_config)
+        self.config.optim_config = optim_config
+        self.config = cast(CBFconfig, self.config)
+        self.cbf_functions = CBFunctionsCasadi(self.config)
     
-    def __call__(self, x0, u0, mask, info):
-        res: Dict = super(CBF, self).__call__(x0, u0, mask, info)
+    def __call__(self, x0, u0, info, mask):
+        res: Dict = super(CBF, self).__call__(x0, u0, info, mask)
         return self._parse_result(res)
     
     def _build_numeric_problem(self):
@@ -71,7 +77,7 @@ class CBF(OCP):
         self._g.append(xk_next - xk_step)
 
         # cons2[>=]: 添加安全约束
-        self._constraint_safety_lane_change_collision(xk[0: 2], xk_next[0: 2])
+        self._constraint_safety_lane_change_collision(xk, xk_next)
 
         self._nlp = \
         {
@@ -88,7 +94,7 @@ class CBF(OCP):
             'du_dim': DU.shape[0],
             'x_dim' : X.shape[0],
             'g_equal_dim' : self.config.nx + self.config.nu + self.config.nx,
-            'g_unequal_dim_1': self.config.N,
+            'g_unequal_dim_1': self.config.filter_num,
         }
 
     def _define_state_update_equation(self):
@@ -107,27 +113,30 @@ class CBF(OCP):
         )
         self._f = ca.Function('f', [x, u, du], [x_next])
     
-    def _constraint_safety_lane_change_collision(self, pk, pk_next):
+    def _constraint_safety_lane_change_collision(self, state_k, state_k_next):
         '''
-        给出安全约束之, 变道碰撞的约束. 当ego变道到另一个道路的时候,
-        可能与另一个车辆相撞, 该约束通过限定两车之间的距离大于零而避免相撞.
-
+        安全约束: ego和其他车辆的椭圆距离应该大于dist_min
         Args:
-            pk: 当前时刻ego的位置信息, 应该是2维;
-            pk_next: 下一时刻ego的位置信息, 应该是2维;
+            state_k     : 时刻k, [x, y, v, theta]的值
+            state_k_next: 时刻k+1, 上述变量的值;
         '''
-        mask = ca.MX.sym('mask', self.config.N)
-        info = ca.MX.sym('info', self.config.N * self.config.info_dim)
-        h = lambda pk, pk_s: ca.sqrt(ca.sumsqr(pk - pk_s) + 1e-6) - self.config.dist_min
-
-        for i in range(self.config.N):
-            pk_s = info[i * self.config.info_dim: (i+1) * self.config.info_dim]
-            self._g.append(ca.if_else(
-                mask[i] > 0, mask[i] * (h(pk_next, pk_s) - (1 + self.config.gamma) * h(pk, pk_s)), 0
-            ))
+        N: int = self.config.filter_num
+        masks  = ca.MX.sym('mask', N)
+        infos_other  = ca.MX.sym('info', N * self.config.info_dim)
         
-        self._p.append(mask)
-        self._p.append(info)
+        info_k = ca.vertcat(state_k[0: 2], state_k[3])
+        info_k_next = ca.vertcat(state_k_next[0: 2], state_k_next[3])
+        h_dist = self.cbf_functions.distance_contrains
+
+        for i in range(N):
+            info_other = infos_other[i * self.config.info_dim: (i+1) * self.config.info_dim]
+            # self._g.append(ca.if_else(
+            #     mask[i] > 0, mask[i] * (h(pk_next, pk_s) - (1 + self.config.gamma) * h(pk, pk_s)), 0
+            # ))
+            self._g.append(h_dist(info_k_next, info_other) - (1 + self.config.gamma) * h_dist(info_k, info_other))
+        
+        self._p.append(infos_other)
+        self._p.append(masks)
 
     def _parse_result(self, res: Dict) -> Tuple[ndarray, ndarray, ndarray, Dict]:
         '''
@@ -140,9 +149,14 @@ class CBF(OCP):
             元组, 第一项是u, 形状是(1, nu); 第二项是du, 形状是(1, nu); 第三项是x, 形状是(2, nx).
         '''
         w: ndarray  = res.get('x', None).full().flatten()
+        
         u: ndarray  = w[0: self._nlp_metadata['u_dim']].reshape(1, self.config.nu)
-        du: ndarray = w[self._nlp_metadata['u_dim']: self._nlp_metadata['u_dim']+self._nlp_metadata['du_dim']].reshape(1, self.config.nu)
-        x: ndarray  = w[self._nlp_metadata['u_dim']+self._nlp_metadata['du_dim']::].reshape(2, self.config.nx)
+        
+        du: ndarray = w[self._nlp_metadata['u_dim']:
+                        self._nlp_metadata['u_dim']+self._nlp_metadata['du_dim']].reshape(1, self.config.nu)
+        
+        x: ndarray  = w[self._nlp_metadata['u_dim']+self._nlp_metadata['du_dim']: 
+                        self._nlp_metadata['u_dim']+self._nlp_metadata['du_dim']+self._nlp_metadata['x_dim']].reshape(2, self.config.nx)
+        
         solve_info = self._get_stats()
-        self._last_w = w
         return u, du, x, solve_info

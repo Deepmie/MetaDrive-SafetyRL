@@ -5,7 +5,7 @@ import numpy as np
 import torch
 from numpy import ndarray
 from torch import Tensor
-from typing import Optional
+from typing import Optional, List
 
 @dataclass
 class RolloutBatchData:
@@ -42,6 +42,7 @@ class RolloutBuffer:
         self.config = config
         if logger is not None:
             self.logger = logger
+        self.quantile_list: List = [0.5, 0.75, 0.9, 0.95, 0.99] # 选择的分位点列表
         self.reset()
     
     def push(self, states: ndarray, actions: ndarray, rewards: ndarray, dones: ndarray, log_probs: Tensor, values: Tensor, z_mpcs: ndarray, z_cbfs: ndarray):
@@ -148,8 +149,10 @@ class RolloutBuffer:
             ratio: float = self.bc_index.sum().item() / self.bc_index.shape[0]
             metadata = dict(
                 max  = cbf_mpc_delta.max().item(), min  = cbf_mpc_delta.min().item(),
-                mean = cbf_mpc_delta.mean().item(),
+                mean = cbf_mpc_delta.mean().item(), non_zero_mean = cbf_mpc_delta[cbf_mpc_delta > 1e-6].mean().item(),
             )
+            quantile_value: Tensor = torch.quantile(cbf_mpc_delta, torch.tensor(self.quantile_list, device=cbf_mpc_delta.device))
+            for ql, qv in zip(self.quantile_list, quantile_value.tolist()): metadata[f'{int(ql * 100)}%'] = float(qv)
             self.logger.write_cbf_ratio(r = ratio, metadata=metadata)
     
     def _flatten(self, t: Tensor): # t.shape = 2 or 3

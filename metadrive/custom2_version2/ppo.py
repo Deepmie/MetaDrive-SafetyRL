@@ -47,8 +47,6 @@ class PPO:
         self.timer: Timer                = Timer()
         self.render_class: RenderClass   = RenderClass()
         
-
-        
         self.schedule    = ConstantSchedule(self.config.epsilon)
 
         # ======== 一些常量 ======== #
@@ -116,7 +114,7 @@ class PPO:
     def close(self):
         self.env.close()
         # self.env_eval.close()
-        if hasattr(self, 'logger'): self.logger.close()
+        if hasattr(self, 'logger') and self.logger is not None: self.logger.close()
 
     def load_weight_from_checkpoint(self, load_path: Optional[str] = None) -> Dict:
         if load_path is None:
@@ -128,7 +126,7 @@ class PPO:
     def _sample(self):
         pbar = tqdm(total=self.config.sample_steps, desc='sample')
         # set_random_seed(0, True) # 对齐用
-
+        
         curr_step: int = 0
         self.buffer.reset() # 采样前先清空buffer
 
@@ -141,14 +139,14 @@ class PPO:
             transed_actions = self._trans_rl_to_control(actions)
             
             # 底层控制
-            controller_result = self.controller.control(transed_actions, self._last_dones)
-
-            obs_nexts, rewards, dones, step_infos = self.env.step(controller_result.control_values_modified)
+            controller_result, _ = self.controller.control(transed_actions, self._last_dones)
+            
+            obs_nexts, rewards, dones, step_infos = self.env.step(controller_result.get_control_values_modified())
             rewards = self._bootstraping(rewards, dones, step_infos)
             
             # 存入buffer
             self.buffer.push(self._last_obss, actions, rewards, self._last_dones, log_probs, values,  # 正常ppo的
-                             controller_result.state_values[:, 2::], controller_result.state_values_modified[:, 2::], )
+                             controller_result.get_state_values(), controller_result.get_state_values_modified(), )
             
             self._last_obss = obs_nexts # update observation
             self._last_dones = dones    # update done
@@ -232,8 +230,8 @@ class PPO:
         for _ in range(self.config.evaluate_total_steps):
             action, _ = self.predict(obs, deterministic=True)
             transed_action = self._trans_rl_to_control(action)
-            controller_result = controller_eval.control(transed_action, last_done)
-            obs, reward, done, step_info = env_eval.step(controller_result.control_values_modified)
+            controller_result, extra_info = controller_eval.control(transed_action, last_done)
+            obs, reward, done, step_info = env_eval.step(controller_result.get_control_values_modified())
             
             total_reward += reward
             if is_render: self.render_class.add_frame(self._render(render_row_text, env_eval))
