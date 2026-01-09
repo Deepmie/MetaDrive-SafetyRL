@@ -20,5 +20,5 @@ pip install casadi swanlab multiprocess
 `cbf_ratio.txt`记录了全局cbf的干预率，以及每个rollout桶收集数据中cbf干预值的统计量，例如中位数、均值、上$\alpha$分位点之类的；<br />
 `record.txt`记录了诸如训练参数、训练过程中奖励变化等，可以较为清晰地看到训练中发生了什么。
 
-该版本的训练情况如图：
-![evaluate gif](results/demo_2025_12_31_14_36_39.gif)
+该版本的训练情况如图：<br />
+<img src="results/demo_2025_12_31_14_36_39.gif" width="500">
