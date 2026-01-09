@@ -13,9 +13,3 @@ pip install casadi swanlab multiprocess
 
 这是一个在MetaDrive上的二次开发库，原项目的github网址为：<br />
 [https://github.com/metadriverse/metadrive](https://github.com/metadriverse/metadrive)
-<<<<<<< HEAD
-=======
-
-
-dddd
->>>>>>> b426ed3a996cb9508c9ce2ccfa3be7efb2952bff
