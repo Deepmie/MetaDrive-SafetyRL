@@ -63,7 +63,7 @@ __pycache__/
 *.whl
 swanlog/
 /github.sh
-/total_code.md
+/target.md
 /custom/
 /dp_single_version2/**/*.gif
 /dp_single_version2/**/*.txt

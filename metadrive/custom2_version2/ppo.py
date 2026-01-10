@@ -131,18 +131,16 @@ class PPO:
         self.buffer.reset() # 采样前先清空buffer
 
         while curr_step < self.config.sample_steps:
-            curr_step += 1
-            pbar.update(1)
-            
             # 上层决策
             actions, log_probs, values = self.policy.select_action(self._last_obss)
             transed_actions = self._trans_rl_to_control(actions)
             
             # 底层控制
-            controller_result, _ = self.controller.control(transed_actions, self._last_dones)
+            controller_result, _ = self.controller.control(transed_actions, self._last_dones, curr_step)
             
             obs_nexts, rewards, dones, step_infos = self.env.step(controller_result.get_control_values_modified())
             rewards = self._bootstraping(rewards, dones, step_infos)
+            rewards += controller_result.get_ppc_rewards()
             
             # 存入buffer
             self.buffer.push(self._last_obss, actions, rewards, self._last_dones, log_probs, values,  # 正常ppo的
@@ -150,6 +148,8 @@ class PPO:
             
             self._last_obss = obs_nexts # update observation
             self._last_dones = dones    # update done
+            curr_step += 1              # update curr step
+            pbar.update(1)              # update pbar
 
         with torch.no_grad():
             values = self.policy.predict_value(converto_torch(obs_nexts))

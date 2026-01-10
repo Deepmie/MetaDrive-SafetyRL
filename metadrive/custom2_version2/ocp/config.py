@@ -54,7 +54,12 @@ class OCPconfig:
 
 @dataclass
 class MPConfig(OCPconfig):
-    ...
+    delta_L: float = 0.2
+    delta_R: float = 0.2
+    alpha: float   = 0.2
+    p_0: float     = 3
+    p_inf: float   = 0.1
+    lota: float    = 0.1
 
 
 @dataclass

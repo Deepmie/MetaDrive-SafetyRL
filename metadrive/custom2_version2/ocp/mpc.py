@@ -2,9 +2,10 @@ import casadi as ca
 from casadi import DM, MX
 import numpy as np
 from numpy import ndarray
-from typing import Tuple, Dict
+from typing import Tuple, Dict, cast
 from metadrive.custom2_version2.ocp.config import MPConfig
 from metadrive.custom2_version2.ocp.base import OCP
+from metadrive.custom2_version2.ocp.performance_metric_func import PerformetricFuncCasadi
 
 class MPC(OCP):
     def __init__(self, config: MPConfig, metadata: Dict):
@@ -15,14 +16,17 @@ class MPC(OCP):
         self.lf = metadata.get('lf', None)
         self.lr = metadata.get('lr', None)
         super(MPC, self).__init__(config, metadata)
+        self.config: MPConfig = cast(MPConfig, self.config)
+        self.performetric_func: PerformetricFuncCasadi = PerformetricFuncCasadi(self.config)
     
-    def __call__(self, x0, z_ref, u_prev) -> Tuple[ndarray, ndarray]:
+    def __call__(self, x0, z_ref, u_prev, curr_step) -> Tuple[ndarray, ndarray]:
         '''
         x0: 当前车辆的状态: [横坐标x, 纵坐标y, 车辆速度v, 车辆角度theta],
         z_ref: 车辆的跟踪轨迹: [参考速度v_ref, 参考角度theta_ref],
-        u_prev: 上一次的控制值: [加速度a_prev, 转向角delta_prev]
+        u_prev: 上一次的控制值: [加速度a_prev, 转向角delta_prev],
+        curr_step: 当前所处的阶段: 一个标量
         '''
-        res: Dict = super(MPC, self).__call__(x0, z_ref, u_prev)
+        res: Dict = super(MPC, self).__call__(x0, z_ref, u_prev, curr_step)
         return self._parse_result(res)
 
     def _build_numeric_problem(self):
@@ -50,13 +54,15 @@ class MPC(OCP):
         X = MX.sym('X', self.config.nx * (self.config.np + 1))
 
         # -------- 添加常量 ------- #
-        x0 = MX.sym('x0', self.config.nx)
-        z_ref = MX.sym('z_ref', 2)
-        u_prev = MX.sym('u_prev', self.config.nu)
+        x0        = MX.sym('x0', self.config.nx)
+        z_ref     = MX.sym('z_ref', 2)
+        u_prev    = MX.sym('u_prev', self.config.nu)
+        curr_step = MX.sym('curr_step', 1)
 
         Q  = DM(np.diag([5, 50])) # error
         R  = DM(np.diag([1, 1]))  # cost
         Rd = DM(np.diag([0, 0]))  # delta
+        P  = DM(np.array([[1, 1]]))  # ppc
         
         g = list()
         cost = 0
@@ -78,9 +84,17 @@ class MPC(OCP):
 
             # 约束和代价更新
             g.append(X[(k+1) * self.config.nx: (k+2) * self.config.nx] - xk_next)
+
+            if k >= 1:
+                if k == 1:
+                    zk_e = zk - z_ref
+                    error = zk_e
+                    zeta = self.performetric_func.error_transformation(error, curr_step)
+                    cost += ca.mtimes([P, zeta])
+                else:
+                    zk_e = zk - zk_last
+                cost += ca.mtimes([zk_e.T, Q, zk_e])
             
-            zk_e = z_ref - zk
-            cost += ca.mtimes([zk_e.T, Q, zk_e])
             cost += ca.mtimes([uk.T, R, uk])
             
             du = uk - u_prev_sym
@@ -88,13 +102,14 @@ class MPC(OCP):
             
             # 控制变量更新
             u_prev_sym = uk
+            zk_last    = zk
         
         self._nlp = \
         {
             'x': ca.vertcat(U, X),
             'f': cost,
             'g': ca.vertcat(*g),
-            'p': ca.vertcat(x0, z_ref, u_prev)
+            'p': ca.vertcat(x0, z_ref, u_prev, curr_step)
         }
 
         self._nlp_metadata = \

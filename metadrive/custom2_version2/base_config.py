@@ -107,6 +107,7 @@ class ControllerConfig:
     control_dim: int       = 2
     vehicle_state_dim: int = 4
     filter_num: int        = 5
+    ppc_coef: float        = 0.2
 
 @dataclass
 class LoggerConfig:

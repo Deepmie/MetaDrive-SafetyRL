@@ -1,6 +1,7 @@
 import numpy as np
 from numpy import ndarray
 import casadi as ca
+from casadi import DM
 from metadrive.custom2_version2.ocp.config import CBFconfig
 
 class CBFunctions:
@@ -42,8 +43,8 @@ class CBFunctionsCasadi:
     LENGTH: float = 4.515  # meters
     WIDTH:  float = 1.852  # meters
     def __init__(self, config: CBFconfig):
-        self.a = self.LENGTH / np.sqrt(2)
-        self.b = self.WIDTH  / np.sqrt(2)
+        self.a = DM(self.LENGTH / np.sqrt(2))
+        self.b = DM(self.WIDTH  / np.sqrt(2))
         self.config = config
 
     def distance_contrains(self, info, info_other): # h(x)
