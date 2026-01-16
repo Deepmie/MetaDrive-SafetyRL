@@ -1,4 +1,4 @@
-from metadrive.custom2_version2.ocp import MPC, CBF
+from metadrive.custom2_version2.ocp import MPC, CBF, MPCEval
 from metadrive.custom2_version2.ocp.config import MPConfig, CBFconfig
 from metadrive.custom2_version2.ocp.cbf_func import CBFunctions
 from metadrive.custom2_version2.ocp.performance_metric_func import PerformetricFunc
@@ -24,14 +24,15 @@ class ControllerResult:
         self.state_values_modified   = np.empty([self._num, self.config.vehicle_state_dim])
         self.control_values          = np.empty([self._num, self.config.control_dim])
         self.control_values_modified = np.empty([self._num, self.config.control_dim])
-        self.ppc_rewards             = np.empty([self._num, ])
+        self.ppc_rewards_errors      = np.empty([self._num, 3])
     
-    def push(self, x_mpc: ndarray, x_cbf: ndarray, u_mpc: ndarray, u_cbf: ndarray, ppc_reward: ndarray):
+    def push(self, x_mpc: ndarray, x_cbf: ndarray, u_mpc: ndarray, u_cbf: ndarray, ppc_reward: ndarray, mpc_error: ndarray):
         self.state_values[self._env_idx, :]             = x_mpc
         self.state_values_modified[self._env_idx, :]    = x_cbf
         self.control_values[self._env_idx, :]           = u_mpc
         self.control_values_modified[self._env_idx, :]  = u_cbf
-        self.ppc_rewards[self._env_idx]                 = ppc_reward
+        self.ppc_rewards_errors[self._env_idx, 0]       = ppc_reward
+        self.ppc_rewards_errors[self._env_idx, 1::]     = mpc_error
         self._env_idx += 1
 
     def update_control_values_prev(self, dones: ndarray):
@@ -64,8 +65,8 @@ class ControllerResult:
         if self.eval_mode: res = res.flatten()
         return res
     
-    def get_ppc_rewards(self) -> ndarray:
-        return self.ppc_rewards
+    def get_ppc_rewards_errors(self) -> ndarray:
+        return self.ppc_rewards_errors
 
 
 
@@ -78,7 +79,7 @@ class Controller:
         self._build_controller()
         self.performetric_func: PerformetricFunc = PerformetricFunc(self.mpc_config)
 
-    def control(self, actions: ndarray, dones: ndarray, curr_step: int) -> Tuple[ControllerResult, Union[Dict]]:
+    def control(self, actions: ndarray, dones: ndarray, curr_step: Optional[int] = None) -> Tuple[ControllerResult, Union[Dict]]:
         # 获得初始状态
         vehicle_states_init = self._get_vehicle_state()
         infos, masks        = self._get_all_vehicle_position()
@@ -89,10 +90,19 @@ class Controller:
             x0 = np.array([state.x, state.y, state.v, state.theta])
             z_ref = actions[idx, :]
             u_prev = self.controller_result.control_values_prev[idx, :]
-            u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev, curr_step)
-            u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
-            ppc_reward: ndarray = self._get_ppc_reward(z_ref, x_mpc, curr_step)
-            self._check_solve_results(x0, x_mpc[0, :], 'mpc x')
+
+            if not self.eval_mode and curr_step is not None:
+                assert isinstance(self.mpc_controller, MPC), 'Type of MPC mismatch!'
+                u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev, curr_step)
+                u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
+                ppc_reward, mpc_error = self._get_ppc_reward(z_ref, x_mpc, curr_step)
+                self._check_solve_results(x0, x_mpc[0, :], 'mpc x')
+            elif self.eval_mode and curr_step is None:
+                assert isinstance(self.mpc_controller, MPCEval), 'Type of MPCEval mismatch!'
+                u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev)
+                u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
+                ppc_reward = 0.0; mpc_error = 0.0
+                self._check_solve_results(x0, x_mpc[0, :], 'mpc x')
             
             # 求解修正的控制量
             info, mask = self._filter_info_mask(np.array([state.x, state.y, state.theta]), info, mask, filter_num=self.config.filter_num)
@@ -106,7 +116,7 @@ class Controller:
                 # self._check_solve_results(u_mpc[0, :], u_cbf[0, :], 'cbf u')
             
             # 存入结果类中
-            self.controller_result.push(x_mpc[1, :], x_cbf[1, :], u_mpc[0, :], u_cbf[0, :], ppc_reward)
+            self.controller_result.push(x_mpc[1, :], x_cbf[1, :], u_mpc[0, :], u_cbf[0, :], ppc_reward, mpc_error)
             
             if self.eval_mode:
                 extra_info: Dict = self._get_extra_test_info(x0, info, state, u_cbf)
@@ -121,7 +131,7 @@ class Controller:
     def _build_controller(self):
         metadata = self.env.get_metadata()
         self.mpc_config = MPConfig(); self.cbf_config = CBFconfig()
-        self.mpc_controller = MPC(self.mpc_config, metadata)
+        self.mpc_controller = MPC(self.mpc_config, metadata) if not self.eval_mode else MPCEval(self.mpc_config, metadata)
         self.cbf_controller = CBF(self.cbf_config, metadata)
         self.cbf_functions: CBFunctions = CBFunctions(self.cbf_config)
 
@@ -161,7 +171,7 @@ class Controller:
         vehicle_state.y = pos[1]
         vehicle_state.v = np.linalg.norm(vel, 2) # 取速度的二范数
         vehicle_state.theta = state.get('heading_theta', None)
-        vehicle_state.a = state.get('throttle_brake', None)
+        vehicle_state.a     = state.get('throttle_brake', None)
         vehicle_state.delta = state.get('steering', None)
         return vehicle_state
     
@@ -204,12 +214,11 @@ class Controller:
         ])
         return x_next
     
-    def _get_ppc_reward(self, z_ref: ndarray, x_mpc: ndarray, step: int) -> ndarray:
+    def _get_ppc_reward(self, z_ref: ndarray, x_mpc: ndarray, step: int) -> Tuple[ndarray, ndarray]:
         z_mpc: ndarray = x_mpc[1, 2::]
         error: ndarray = z_mpc - z_ref
-        error = np.clip(error, -5, 5)
         zeta: float = self.performetric_func.error_transformation(error, step)
         P: ndarray = np.array([[1, 1]])
-        return -self.config.ppc_coef * min(P @ zeta, 5)
+        return -self.config.ppc_coef * min(P @ zeta, 5), error
 
 

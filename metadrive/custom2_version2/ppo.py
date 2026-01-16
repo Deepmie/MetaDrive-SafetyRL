@@ -15,6 +15,7 @@ from metadrive.custom2_version2.utils import converto_ndarray, converto_torch, L
 from metadrive.custom2_version2.create_env import create_env, create_render_config
 from metadrive.custom2_version2.type import ActionType, RenderClass
 from metadrive.custom2_version2.controller import Controller
+from metadrive.custom2_version2.monitor import Monitor
 from typing import Tuple, Dict, Union, Optional, List, cast
 from tqdm import tqdm
 from functools import partial
@@ -25,7 +26,7 @@ class PPO:
     def __init__(self, config: PPOConfig, eval_mode: bool = False):
         self.config = config
         self.now_datetime = datetime.now().strftime("%Y_%m_%d_%H_%M_%S")
-        self.final_evaluate_path = f'{self.config.evaluate_save_root}/demo_{self.now_datetime}.gif'
+        # self.final_evaluate_path = f'{self.config.evaluate_save_root}/demo_{self.now_datetime}.gif'
         self.eval_mode = eval_mode
 
         self.env: ParallelEnv = ParallelEnv(
@@ -38,14 +39,15 @@ class PPO:
         # )
         self._create_logger()
         
-        self.policy: Policy = Policy(self.config.policy_config)
+        self.policy: Policy        = Policy(self.config.policy_config)
         self.buffer: RolloutBuffer = RolloutBuffer(self.config.buffer_config, logger=self.logger)
-        self._last_obss  = self.env.reset() # 初始化第一次的env
+        self._last_obss            = self.env.reset() # 初始化第一次的env
         # self.env_eval.reset()
         
         self.controller: Controller      = Controller(self.env, self.config.controller_config, eval_mode=False)
         self.timer: Timer                = Timer()
         self.render_class: RenderClass   = RenderClass()
+        self.monitor: Monitor            = Monitor(self.logger_path)
         
         self.schedule    = ConstantSchedule(self.config.epsilon)
 
@@ -102,8 +104,8 @@ class PPO:
         #         self.close()
         return self._start_successful, start_info
     
-    def final_eval(self):
-        reward_eval = self._evaluate(True, self.final_evaluate_path)
+    def final_eval(self, evaluate_path: Optional[str] = None):
+        reward_eval = self._evaluate(True, evaluate_path)
         print(f'episode_reward {reward_eval}')
         print('gif generation is finished ...')
     
@@ -140,12 +142,16 @@ class PPO:
             
             obs_nexts, rewards, dones, step_infos = self.env.step(controller_result.get_control_values_modified())
             rewards = self._bootstraping(rewards, dones, step_infos)
-            rewards += controller_result.get_ppc_rewards()
+            ppc_rewards_errors: ndarray = controller_result.get_ppc_rewards_errors()
+            rewards += ppc_rewards_errors[:, 0]
             
             # 存入buffer
             self.buffer.push(self._last_obss, actions, rewards, self._last_dones, log_probs, values,  # 正常ppo的
                              controller_result.get_state_values(), controller_result.get_state_values_modified(), )
             
+            # 存入监视器
+            self.monitor.collect_ppc_errors(ppc_rewards_errors[:, 1::])
+
             self._last_obss = obs_nexts # update observation
             self._last_dones = dones    # update done
             curr_step += 1              # update curr step
@@ -330,10 +336,14 @@ class PPO:
     
     def _create_logger(self):
         if not self.eval_mode:
-            self.logger: Logger = Logger(self.config.logger_config)
+            self.logger: Logger   = Logger(self.config.logger_config)
+            self.logger_path: str = self.logger.get_logger_path().strip()
 
             if hasattr(self, 'final_evaluate_path'):
                 self.logger.write_tabel_additional_params(['final_evaluate_path'], [os.path.basename(self.final_evaluate_path)])
+
+            with open('dp_single_version2/logger_path.txt', mode='w', encoding='utf-8') as writer:
+                writer.write(self.logger_path)
         else:
             self.logger = None
 

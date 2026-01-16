@@ -39,10 +39,11 @@ class Logger:
         # =================日志路径名================= #
         logger_path: str           = os.path.join(config.logger_path_root, 'log_{}'.format(self.now_datetime.strftime("%Y_%m_%d_%H_%M_%S")))
         record_path: str           = os.path.join(logger_path, 'record.txt')
-        cbf_ratio_record_path: str = os.path.join(logger_path, 'cbf_ratio.txt')
+        cbf_ratio_record_path: str = os.path.join(logger_path, 'record_cbf_ratio.txt')
         # ========================================== #
         
         os.mkdir(logger_path) # 创建文件夹
+        self.logger_path = logger_path
         self.record_file = open(record_path, mode='w', encoding='utf-8')
         self.ratio_record_file = open(cbf_ratio_record_path, mode='w', encoding='utf-8')
 
@@ -127,6 +128,10 @@ class Logger:
             if idx < len(metadata) - 1: metadata_string += ', '
         self._write(f'{self._cbf_ratio_record_index}: {r * 100 : .4f}%, {metadata_string}\n', file_name='ratio_record')
         self._cbf_ratio_record_index += 1
+    
+    def get_logger_path(self) -> str:
+        if not hasattr(self, 'logger_path'): raise Exception('Please init Logger class first!')
+        return self.logger_path
     
     def _get_file(self, file_name: str = 'record') -> TextIOWrapper:
         file_name_real: str = f'{file_name}_file'

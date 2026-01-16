@@ -3,7 +3,9 @@ sys.path.append('/workspace/metadrive-github/')
 from metadrive.custom2_version2.base_config import PPOConfig
 from metadrive.custom2_version2.ppo import PPO
 from metadrive.custom2_version2.utils import set_random_seed
+from metadrive.custom2_version2.utils.utils import get_logger_path
 import argparse
+import os
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='evaluate process')
@@ -12,17 +14,19 @@ if __name__ == '__main__':
     args = parser.parse_args()
 
     set_random_seed(0)
-    ppo_config = PPOConfig()
-    ppo = PPO(ppo_config, eval_mode=True)
+    ppo_config: PPOConfig = PPOConfig()
+    ppo: PPO              = PPO(ppo_config, eval_mode=True)
+    logger_path: str      = get_logger_path()
     
     if args.type == 'newest':
-        ckpt_path = ppo_config.policy_checkpoint_pth
+        ckpt_path = os.path.join(logger_path, ppo_config.policy_checkpoint_pth)
     elif args.type == 'best':
-        ckpt_path = ppo_config.best_policy_checkpoint_pth
+        ckpt_path = os.path.join(logger_path, ppo_config.best_policy_checkpoint_pth)
     else:
         raise TypeError(f'Arg `type` must in [newest, best], but you give {args.type} not in list.')
     
     metadata = ppo.load_weight_from_checkpoint(ckpt_path)
     print(f'metadata: \n{metadata}')
-    ppo.final_eval()
+    ppo.final_eval(os.path.join(logger_path, ppo_config.evaluate_save_root))
     ppo.close()
+    

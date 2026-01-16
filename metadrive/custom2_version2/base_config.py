@@ -6,7 +6,7 @@ from numpy import ndarray
 from typing import Dict, Optional, Tuple
 from metadrive.custom2_version2.type import ActionType
 
-TEST_MODE            = False
+TEST_MODE            = True
 STATE_DIM            = 259
 ACTION_DIM           = 2
 TORCH_DTYPE          = torch.float32
@@ -26,7 +26,7 @@ EPOCH                = 20
 # MAX_BUFFER_SIZE  = 4096 if not TEST_MODE else 256
 MAX_BUFFER_SIZE      = 4096    if not TEST_MODE else 256
 BATCH_SIZE           = 64
-EVALUATE_STEPS       = 20000  if not TEST_MODE else 50
+EVALUATE_STEPS       = 10000  if not TEST_MODE else 50
 EVALUATE_TOTAL_STEPS = 2000
 TOTAL_STEPS          = 2000000 if not TEST_MODE else 9000
 
@@ -153,9 +153,8 @@ class PPOConfig:
     is_load: bool                    = IS_LOAD
     delta_bc: float                  = DELTA_BC
     logger_save_root: str            = 'dp_single_version2/logger'
-    policy_checkpoint_pth: str       = 'dp_single_version2/ckp_pth/policy.pth'
-    best_policy_checkpoint_pth: str  = 'dp_single_version2/ckp_pth/best_policy.pth'
-    evaluate_save_root: str          = 'dp_single_version2/eval'
+    policy_checkpoint_pth: str       = 'policy.pth'
+    best_policy_checkpoint_pth: str  = 'policy_best.pth'
     device: torch.device             = TORCH_DEVICE
 
 
