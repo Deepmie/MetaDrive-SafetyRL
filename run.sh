@@ -21,6 +21,11 @@ case "$1" in
         echo "generate code from project..."
         python generate_code.py
     ;;
+    github)
+        git add .
+        git commit -m "update file"
+        git push
+    ;;
     *)
         echo "instruction error, must choose in [train, check_env, eval, best_eval], you give \`$1\`."
     ;;
