@@ -150,7 +150,7 @@ class PPO:
                              controller_result.get_state_values(), controller_result.get_state_values_modified(), )
             
             # 存入监视器
-            self.monitor.collect_ppc_errors(ppc_rewards_errors[:, 1::])
+            self.monitor.collect_ppc_errors(ppc_rewards_errors[:, 1::], save_freq=self.config.monitor_save_freq)
 
             self._last_obss = obs_nexts # update observation
             self._last_dones = dones    # update done

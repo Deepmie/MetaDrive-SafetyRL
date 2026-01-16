@@ -95,7 +95,7 @@ class Controller:
                 assert isinstance(self.mpc_controller, MPC), 'Type of MPC mismatch!'
                 u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev, curr_step)
                 u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
-                ppc_reward, mpc_error = self._get_ppc_reward(z_ref, x_mpc, curr_step)
+                ppc_reward, mpc_error = self._get_ppc_reward_error(z_ref, x_mpc, curr_step)
                 self._check_solve_results(x0, x_mpc[0, :], 'mpc x')
             elif self.eval_mode and curr_step is None:
                 assert isinstance(self.mpc_controller, MPCEval), 'Type of MPCEval mismatch!'
@@ -214,11 +214,11 @@ class Controller:
         ])
         return x_next
     
-    def _get_ppc_reward(self, z_ref: ndarray, x_mpc: ndarray, step: int) -> Tuple[ndarray, ndarray]:
+    def _get_ppc_reward_error(self, z_ref: ndarray, x_mpc: ndarray, step: int) -> Tuple[ndarray, ndarray]:
         z_mpc: ndarray = x_mpc[1, 2::]
         error: ndarray = z_mpc - z_ref
         zeta: float = self.performetric_func.error_transformation(error, step)
         P: ndarray = np.array([[1, 1]])
-        return -self.config.ppc_coef * min(P @ zeta, 5), error
+        return -self.config.ppc_coef * (P @ zeta), error
 
 

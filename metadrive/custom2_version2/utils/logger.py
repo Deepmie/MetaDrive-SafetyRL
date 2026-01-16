@@ -38,7 +38,7 @@ class Logger:
         
         # =================日志路径名================= #
         logger_path: str           = os.path.join(config.logger_path_root, 'log_{}'.format(self.now_datetime.strftime("%Y_%m_%d_%H_%M_%S")))
-        record_path: str           = os.path.join(logger_path, 'record.txt')
+        record_path: str           = os.path.join(logger_path, 'record_rl_reward.txt')
         cbf_ratio_record_path: str = os.path.join(logger_path, 'record_cbf_ratio.txt')
         # ========================================== #
         

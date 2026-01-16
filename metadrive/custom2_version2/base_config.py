@@ -16,6 +16,7 @@ MAX_EPS_COUNTS       = 100
 N_PROCESS            = 4
 GAE_LAMBDA           = 0.95
 UPDATE_FREQ          = 1
+MONITOR_SAVE_FREQ    = 5000 if not TEST_MODE else 100
 IS_LOAD              = False
 
 # Paper Param:
@@ -133,6 +134,7 @@ class PPOConfig:
     total_steps: int                 = TOTAL_STEPS       # 总的期望采样长度
     max_eps_counts: int              = MAX_EPS_COUNTS    # 一个回合最大的采样数量
     update_freq: int                 = UPDATE_FREQ       # 经过多少步才更新
+    monitor_save_freq: int           = MONITOR_SAVE_FREQ # 经过多少步更新monitor的权重
     epoch: int                       = EPOCH
     batch_size: int                  = BATCH_SIZE
     epsilon: float                   = 0.2
