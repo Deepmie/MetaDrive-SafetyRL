@@ -38,6 +38,8 @@ class PPO:
         #     self.config.parallel_env_config,
         # )
         self._create_logger()
+        self.best_policy_checkpoint_pth: str = os.path.join(self.logger_path, self.config.best_policy_checkpoint_pth)
+        self.policy_checkpoint_pth: str      = os.path.join(self.logger_path, self.config.policy_checkpoint_pth)
         
         self.policy: Policy        = Policy(self.config.policy_config)
         self.buffer: RolloutBuffer = RolloutBuffer(self.config.buffer_config, logger=self.logger)
@@ -84,15 +86,15 @@ class PPO:
 
             print('\nstart to train...')
             self._train()
-
+            
             if self.num_steps >= (evaluate_idx + 1) * self.config.evaluate_steps:
                 print('\nstart to evaluate & save...')
                 evaluate_reward = self._evaluate()
-                if evaluate_reward > best_reward: self._save(evaluate_reward=evaluate_reward, ckp_pth=self.config.best_policy_checkpoint_pth); best_reward = evaluate_reward
+                if evaluate_reward > best_reward: self._save(evaluate_reward=evaluate_reward, ckp_pth=self.best_policy_checkpoint_pth); best_reward = evaluate_reward
                 self.logger.write_reward(evaluate_reward, best_reward=best_reward)
                 evaluate_idx += 1
 
-                self._save(evaluate_reward=evaluate_reward, ckp_pth=self.config.policy_checkpoint_pth)
+                self._save(evaluate_reward=evaluate_reward, ckp_pth=self.policy_checkpoint_pth)
         
         self._start_successful = True
         start_info = 'Successful!'

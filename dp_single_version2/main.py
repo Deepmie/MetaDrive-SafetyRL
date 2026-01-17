@@ -16,8 +16,8 @@ if __name__ == '__main__':
         print(info)
     else:
         print('Training have finished! Start to final evaluate...')
-        ppo.final_eval(os.path.join(logger_path, 'final_eval.gif'))
+        ppo.final_eval(os.path.join(logger_path, 'eval_final.gif'))
         ppo.load_weight_from_checkpoint(os.path.join(logger_path, ppo_config.best_policy_checkpoint_pth))
-        ppo.final_eval(os.path.join(logger_path, 'best_eval.gif'))
+        ppo.final_eval(os.path.join(logger_path, 'eval_best.gif'))
         ppo.close()
         

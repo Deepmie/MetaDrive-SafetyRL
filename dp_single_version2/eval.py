@@ -27,6 +27,6 @@ if __name__ == '__main__':
     
     metadata = ppo.load_weight_from_checkpoint(ckpt_path)
     print(f'metadata: \n{metadata}')
-    ppo.final_eval(os.path.join(logger_path, ppo_config.evaluate_save_root))
+    ppo.final_eval(os.path.join(logger_path, 'evaluate.gif'))
     ppo.close()
     
