@@ -68,5 +68,6 @@ swanlog/
 /dp_single_version2/**/*.gif
 /dp_single_version2/**/*.txt
 /dp_single_version2/**/*.pth
+/dp_single_version2/metadata.json
 /dp_single_version2/log**/
 /results
