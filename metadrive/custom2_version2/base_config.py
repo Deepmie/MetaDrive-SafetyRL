@@ -8,7 +8,7 @@ from metadrive.custom2_version2.type import ActionType
 
 TEST_MODE            = True
 STATE_DIM            = 259
-ACTION_DIM           = 2
+ACTION_DIM           = 4
 TORCH_DTYPE          = torch.float32
 TORCH_DEVICE         = torch.device(device='cuda:0') if torch.cuda.is_available() else torch.device(device='cpu')
 # TORCH_DEVICE         = torch.device(device='cpu')
@@ -144,10 +144,17 @@ class PPOConfig:
     learning_rate: float             = 3e-4
     max_grad_norm: float             = 0.5
     action_space_range: Tuple        = (-1, 1)
+
+    # parameters' range
     v_min: float                     = 0.0
     v_max: float                     = 15.0
     theta_min: float                 = -np.pi / 3
     theta_max: float                 =  np.pi / 3
+    p_inf_min: float                 = 0.1
+    p_inf_max: float                 = 1.0
+    lota_min: float                  = 0.01
+    lota_max: float                  = 1.0
+    
     update_freq: int                 = UPDATE_FREQ       # 经过多少步才更新
     target_kl: Optional[float]       = None
     evaluate_steps: int              = EVALUATE_STEPS

@@ -75,24 +75,19 @@ class PerformetricFuncCasadi:
         self.config = config
         self._set_attr()
     
-    def error_transformation(self, error, step):
-        p = self.caculate(step)
-        error_norm = error / (p * self.delta_L)
-        # return 1 / 2 * ca.log((error_norm + self.delta_L + self._eps) / (self.delta_R - error_norm + self._eps))
-        return ca.exp(self.alpha * error_norm ** 2) - 1
+    def error_transformation(self, error, Q, p_inf, lota, step):
+        p = self.caculate(p_inf, lota, step)
+        return ca.mtimes([error.T, Q, error]) * (1 / p**2)
 
-    def caculate(self, step):
-        return (self.p_0 - self.p_inf) * ca.exp(-self.lota * step) + self.p_inf
+    def caculate(self, p_inf, lota, step):
+        return (self.p_0 - p_inf) * ca.exp(-lota * step) + p_inf
     
     def _set_attr(self):
         self.p_0     = DM(self.config.p_0)
-        self.p_inf   = DM(self.config.p_inf)
-        self.lota    = DM(self.config.lota)
         self.delta_L = DM(self.config.delta_L)
         self.delta_R = DM(self.config.delta_R)
         self.alpha   = DM(self.config.alpha)
         self._eps    = 1e-6
-
 
 
 if __name__ == '__main__':

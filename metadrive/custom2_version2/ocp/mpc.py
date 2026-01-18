@@ -19,14 +19,16 @@ class MPC(OCP):
         self.config: MPConfig = cast(MPConfig, self.config)
         self.performetric_func: PerformetricFuncCasadi = PerformetricFuncCasadi(self.config)
     
-    def __call__(self, x0, z_ref, u_prev, curr_step) -> Tuple[ndarray, ndarray]:
+    def __call__(self, x0, z_ref, u_prev, p_inf, lota, curr_step) -> Tuple[ndarray, ndarray]:
         '''
         x0: 当前车辆的状态: [横坐标x, 纵坐标y, 车辆速度v, 车辆角度theta],
         z_ref: 车辆的跟踪轨迹: [参考速度v_ref, 参考角度theta_ref],
         u_prev: 上一次的控制值: [加速度a_prev, 转向角delta_prev],
+        p_inf: 收紧的最小值
+        lota: 收紧速率
         curr_step: 当前所处的阶段: 一个标量
         '''
-        res: Dict = super(MPC, self).__call__(x0, z_ref, u_prev, curr_step)
+        res: Dict = super(MPC, self).__call__(x0, z_ref, u_prev, p_inf, lota, curr_step)
         return self._parse_result(res)
 
     def _build_numeric_problem(self):
@@ -57,6 +59,8 @@ class MPC(OCP):
         x0        = MX.sym('x0', self.config.nx)
         z_ref     = MX.sym('z_ref', 2)
         u_prev    = MX.sym('u_prev', self.config.nu)
+        p_inf     = MX.sym('p_inf', 1)
+        lota      = MX.sym('lota', 1)
         curr_step = MX.sym('curr_step', 1)
 
         Q  = DM(np.diag([5, 50])) # error
@@ -88,12 +92,9 @@ class MPC(OCP):
             if k >= 1:
                 if k == 1:
                     zk_e = zk - z_ref
-                    error = zk_e
-                    zeta = self.performetric_func.error_transformation(error, curr_step)
-                    cost += ca.mtimes([P, zeta])
                 else:
                     zk_e = zk - zk_last
-                cost += ca.mtimes([zk_e.T, Q, zk_e])
+                cost += self.performetric_func.error_transformation(zk_e, Q, p_inf, lota, curr_step)
             
             cost += ca.mtimes([uk.T, R, uk])
             
@@ -109,7 +110,7 @@ class MPC(OCP):
             'x': ca.vertcat(U, X),
             'f': cost,
             'g': ca.vertcat(*g),
-            'p': ca.vertcat(x0, z_ref, u_prev, curr_step)
+            'p': ca.vertcat(x0, z_ref, u_prev, p_inf, lota, curr_step)
         }
 
         self._nlp_metadata = \

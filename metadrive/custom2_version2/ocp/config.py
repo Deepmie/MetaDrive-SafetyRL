@@ -40,8 +40,8 @@ class OptimConfig:
 
 @dataclass
 class OCPconfig:
-    np: int                   = 3         # step的数量
-    mu: int                   = 3         # u的控制时域
+    np: int                   = 5         # step的数量
+    mu: int                   = 5         # u的控制时域
     nx: int                   = 4         # 状态的维度, [x, y, v, theta]
     nu: int                   = 2         # 控制的维度, [a, delta]
     Ts: int                   = 0.02 * 5  # 周期

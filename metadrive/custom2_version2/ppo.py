@@ -54,7 +54,7 @@ class PPO:
         self.schedule    = ConstantSchedule(self.config.epsilon)
 
         # ======== 一些常量 ======== #
-        self._last_dones = np.array([True, ]) # 初始化第一次的done
+        self._last_dones = np.ones([self.config.n_process]) # 初始化第一次的done
         self._remaining  = 1.0
         self.num_steps   = 0.0
         self._start_successful: Optional[bool] = None
@@ -131,7 +131,7 @@ class PPO:
         pbar = tqdm(total=self.config.sample_steps, desc='sample')
         # set_random_seed(0, True) # 对齐用
         
-        curr_step: int = 0
+        curr_step: int    = 0
         self.buffer.reset() # 采样前先清空buffer
 
         while curr_step < self.config.sample_steps:
@@ -140,19 +140,19 @@ class PPO:
             transed_actions = self._trans_rl_to_control(actions)
             
             # 底层控制
-            controller_result, _ = self.controller.control(transed_actions, self._last_dones, curr_step)
+            controller_result, _ = self.controller.control(transed_actions, self._last_dones)
             
             obs_nexts, rewards, dones, step_infos = self.env.step(controller_result.get_control_values_modified())
             rewards = self._bootstraping(rewards, dones, step_infos)
-            ppc_rewards_errors: ndarray = controller_result.get_ppc_rewards_errors()
-            rewards += ppc_rewards_errors[:, 0]
+            # ppc_rewards_errors: ndarray = controller_result.get_ppc_rewards_errors()
+            # rewards += ppc_rewards_errors[:, 0]
             
             # 存入buffer
             self.buffer.push(self._last_obss, actions, rewards, self._last_dones, log_probs, values,  # 正常ppo的
                              controller_result.get_state_values(), controller_result.get_state_values_modified(), )
             
             # 存入监视器
-            self.monitor.collect_ppc_errors(ppc_rewards_errors[:, 1::], save_freq=self.config.monitor_save_freq)
+            # self.monitor.collect_ppc_errors(ppc_rewards_errors[:, 1::], save_freq=self.config.monitor_save_freq)
 
             self._last_obss = obs_nexts # update observation
             self._last_dones = dones    # update done
@@ -332,9 +332,14 @@ class PPO:
         
         # 反归一化
         new_actions = np.empty_like(actions)
-        new_actions[:, 0] = (clipped_actions[:, 0] + 1) / 2 * (self.config.v_max - self.config.v_min) + self.config.v_min
-        new_actions[:, 1] = (clipped_actions[:, 1] + 1) / 2 * (self.config.theta_max - self.config.theta_min) + self.config.theta_min
+        new_actions[:, 0] = self._renorm(clipped_actions[:, 0], self.config.v_max, self.config.v_min)
+        new_actions[:, 1] = self._renorm(clipped_actions[:, 1], self.config.theta_max, self.config.theta_min)
+        new_actions[:, 2] = self._renorm(clipped_actions[:, 2], self.config.p_inf_max, self.config.p_inf_min)
+        new_actions[:, 3] = self._renorm(clipped_actions[:, 3], self.config.lota_max, self.config.lota_min)
         return new_actions
+    
+    def _renorm(self, v: ndarray, v_max: float, v_min: float) -> ndarray: # 反归一化函数
+        return (v + 1) / 2 * (v_max - v_min) + v_min
     
     def _create_logger(self):
         if not self.eval_mode:

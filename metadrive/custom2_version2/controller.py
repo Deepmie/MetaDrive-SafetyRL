@@ -1,4 +1,4 @@
-from metadrive.custom2_version2.ocp import MPC, CBF, MPCEval
+from metadrive.custom2_version2.ocp import MPC, CBF
 from metadrive.custom2_version2.ocp.config import MPConfig, CBFconfig
 from metadrive.custom2_version2.ocp.cbf_func import CBFunctions
 from metadrive.custom2_version2.ocp.performance_metric_func import PerformetricFunc
@@ -75,34 +75,42 @@ class Controller:
         self.env = env
         self.config = config
         self.eval_mode = eval_mode
+        self._num = self.config.n_process if not eval_mode else 1
         self.controller_result = ControllerResult(self.config, eval_mode=eval_mode)
         self._build_controller()
         self.performetric_func: PerformetricFunc = PerformetricFunc(self.mpc_config)
+        self.episode_steps = np.zeros([self._num, 1], dtype=np.float32)
 
-    def control(self, actions: ndarray, dones: ndarray, curr_step: Optional[int] = None) -> Tuple[ControllerResult, Union[Dict]]:
+    def control(self, actions: ndarray, dones: ndarray) -> Tuple[ControllerResult, Union[Dict]]:
         # 获得初始状态
         vehicle_states_init = self._get_vehicle_state()
         infos, masks        = self._get_all_vehicle_position()
         actions, dones      = self._preprocess_var(actions), self._preprocess_var(dones)
         self.controller_result.reset()
+
+        # ====== update if done include `True` ===== #
+        self.episode_steps *= 1 - dones.reshape(-1, 1) #如果当前步已经完成了
+        self.controller_result.update_control_values_prev(dones)
+        # ========================================== #
         
         for idx, (state, info, mask, ) in enumerate(zip(vehicle_states_init, infos, masks)):
             x0 = np.array([state.x, state.y, state.v, state.theta])
-            z_ref = actions[idx, :]
+            z_ref = actions[idx, 0: 2]; p_inf = actions[idx, 2: 3]; lota = actions[idx, 3::]; episode_step = self.episode_steps[idx, :]
             u_prev = self.controller_result.control_values_prev[idx, :]
 
-            if not self.eval_mode and curr_step is not None:
-                assert isinstance(self.mpc_controller, MPC), 'Type of MPC mismatch!'
-                u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev, curr_step)
-                u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
-                ppc_reward, mpc_error = self._get_ppc_reward_error(z_ref, x_mpc, curr_step)
-                self._check_solve_results(x0, x_mpc[0, :], 'mpc x')
-            elif self.eval_mode and curr_step is None:
-                assert isinstance(self.mpc_controller, MPCEval), 'Type of MPCEval mismatch!'
-                u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev)
-                u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
-                ppc_reward = 0.0; mpc_error = 0.0
-                self._check_solve_results(x0, x_mpc[0, :], 'mpc x')
+            # if not self.eval_mode and curr_step is not None:
+            assert isinstance(self.mpc_controller, MPC), 'Type of MPC mismatch!'
+            u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev, p_inf, lota, episode_step)
+            u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
+            # ppc_reward, mpc_error = self._get_ppc_reward_error(z_ref, x_mpc, curr_step)
+            ppc_reward, mpc_error = 0.0, 0.0
+            self._check_solve_results(x0, x_mpc[0, :], 'mpc x')
+            # elif self.eval_mode and curr_step is None:
+            #     assert isinstance(self.mpc_controller, MPCEval), 'Type of MPCEval mismatch!'
+            #     u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev)
+            #     u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
+            #     ppc_reward = 0.0; mpc_error = 0.0
+            #     self._check_solve_results(x0, x_mpc[0, :], 'mpc x')
             
             # 求解修正的控制量
             info, mask = self._filter_info_mask(np.array([state.x, state.y, state.theta]), info, mask, filter_num=self.config.filter_num)
@@ -124,14 +132,13 @@ class Controller:
             else:
                 extra_info = None
         
-        # 更新control的values
-        self.controller_result.update_control_values_prev(dones)
+        self.episode_steps += 1 # 整体add 1
         return deepcopy(self.controller_result), extra_info
 
     def _build_controller(self):
         metadata = self.env.get_metadata()
         self.mpc_config = MPConfig(); self.cbf_config = CBFconfig()
-        self.mpc_controller = MPC(self.mpc_config, metadata) if not self.eval_mode else MPCEval(self.mpc_config, metadata)
+        self.mpc_controller = MPC(self.mpc_config, metadata)
         self.cbf_controller = CBF(self.cbf_config, metadata)
         self.cbf_functions: CBFunctions = CBFunctions(self.cbf_config)
 
