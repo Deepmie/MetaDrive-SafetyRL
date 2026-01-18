@@ -59,7 +59,7 @@ class PerformetricFunc:
             ax2.set_title('Performance Error')
 
         fig.savefig('dp_single_version2/check/check_performance_metric_func.png')
-
+    
     def _set_attr(self):
         self.p_0   = self.config.p_0
         self.p_inf = self.config.p_inf

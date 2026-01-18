@@ -11,7 +11,7 @@ from metadrive.custom2_version2.policy import Policy
 from metadrive.custom2_version2.buffer import RolloutBuffer, RolloutBatchData
 from metadrive.custom2_version2.envs import ParallelEnv, SingleEnv
 from metadrive.custom2_version2.schedule import ConstantSchedule
-from metadrive.custom2_version2.utils import converto_ndarray, converto_torch, Logger, Timer
+from metadrive.custom2_version2.utils import converto_ndarray, converto_torch, Logger, Timer, insert_metadata_path, get_metadata_from_path
 from metadrive.custom2_version2.create_env import create_env, create_render_config
 from metadrive.custom2_version2.type import ActionType, RenderClass
 from metadrive.custom2_version2.controller import Controller
@@ -21,6 +21,7 @@ from tqdm import tqdm
 from functools import partial
 from datetime import datetime
 import os
+import traceback
 
 class PPO:
     def __init__(self, config: PPOConfig, eval_mode: bool = False):
@@ -40,6 +41,7 @@ class PPO:
         self._create_logger()
         self.best_policy_checkpoint_pth: str = os.path.join(self.logger_path, self.config.best_policy_checkpoint_pth)
         self.policy_checkpoint_pth: str      = os.path.join(self.logger_path, self.config.policy_checkpoint_pth)
+        self.metadata_pth: str               = os.path.join(self.logger_path, 'metadata.json')
         
         self.policy: Policy        = Policy(self.config.policy_config)
         self.buffer: RolloutBuffer = RolloutBuffer(self.config.buffer_config, logger=self.logger)
@@ -58,6 +60,7 @@ class PPO:
         self._remaining  = 1.0
         self.num_steps   = 0.0
         self._start_successful: Optional[bool] = None
+        self.sample_global_steps: int = 0 if not eval_mode else get_metadata_from_path(self.metadata_pth).get('sample_global_steps', 0)
 
         # ====== 训练的初始化 ====== #
         self.optimizer = Adam(self.policy.parameters(), lr=self.config.learning_rate)
@@ -71,39 +74,40 @@ class PPO:
         return is_suc, info
     
     def _start(self) -> Tuple[bool, str]:
-        # try:
-        pbar = tqdm(total=self.config.total_steps, desc='total')
-        iterations   = 0
-        evaluate_idx = 0
-        best_reward  = -float('inf')
-        while self.num_steps < self.config.total_steps:
-            print('\nstart to sample...')
-            self._sample()
-            iterations += 1
-            self.num_steps = self.config.n_process * iterations * self.config.sample_steps
-            self._update_remaining(self.num_steps)
-            pbar.update(self.config.n_process * self.config.sample_steps)
+        try:
+            pbar = tqdm(total=self.config.total_steps, desc='total')
+            iterations   = 0
+            evaluate_idx = 0
+            best_reward  = -float('inf')
+            while self.num_steps < self.config.total_steps:
+                print('\nstart to sample...')
+                self._sample()
+                iterations += 1
+                self.num_steps = self.config.n_process * iterations * self.config.sample_steps
+                self._update_remaining(self.num_steps)
+                pbar.update(self.config.n_process * self.config.sample_steps)
 
-            print('\nstart to train...')
-            self._train()
+                print('\nstart to train...')
+                self._train()
+                
+                if self.num_steps >= (evaluate_idx + 1) * self.config.evaluate_steps:
+                    print('\nstart to evaluate & save...')
+                    evaluate_reward = self._evaluate()
+                    if evaluate_reward > best_reward: self._save(evaluate_reward=evaluate_reward, ckp_pth=self.best_policy_checkpoint_pth); best_reward = evaluate_reward
+                    self.logger.write_reward(evaluate_reward, best_reward=best_reward)
+                    evaluate_idx += 1
+
+                    self._save(evaluate_reward=evaluate_reward, ckp_pth=self.policy_checkpoint_pth)
+                    insert_metadata_path('sample_global_steps', self.sample_global_steps, metadata_path=self.metadata_pth)
             
-            if self.num_steps >= (evaluate_idx + 1) * self.config.evaluate_steps:
-                print('\nstart to evaluate & save...')
-                evaluate_reward = self._evaluate()
-                if evaluate_reward > best_reward: self._save(evaluate_reward=evaluate_reward, ckp_pth=self.best_policy_checkpoint_pth); best_reward = evaluate_reward
-                self.logger.write_reward(evaluate_reward, best_reward=best_reward)
-                evaluate_idx += 1
-
-                self._save(evaluate_reward=evaluate_reward, ckp_pth=self.policy_checkpoint_pth)
-        
-        self._start_successful = True
-        start_info = 'Successful!'
-        # except Exception:
-        #     self._start_successful = False
-        #     start_info = traceback.format_exc()
-        # finally:
-        #     if not self._start_successful:
-        #         self.close()
+            self._start_successful = True
+            start_info = 'Successful!'
+        except Exception:
+            self._start_successful = False
+            start_info = traceback.format_exc()
+        finally:
+            if not self._start_successful:
+                self.close()
         return self._start_successful, start_info
     
     def final_eval(self, evaluate_path: Optional[str] = None):
@@ -140,24 +144,26 @@ class PPO:
             transed_actions = self._trans_rl_to_control(actions)
             
             # 底层控制
-            controller_result, _ = self.controller.control(transed_actions, self._last_dones, curr_step)
+            controller_result, _ = self.controller.control(transed_actions, self._last_dones, self.sample_global_steps)
             
             obs_nexts, rewards, dones, step_infos = self.env.step(controller_result.get_control_values_modified())
             rewards = self._bootstraping(rewards, dones, step_infos)
-            ppc_rewards_errors: ndarray = controller_result.get_ppc_rewards_errors()
-            rewards += ppc_rewards_errors[:, 0]
+            # ppc_rewards_errors: ndarray = controller_result.get_ppc_rewards_errors()
+            # rewards += ppc_rewards_errors[:, 0]
             
             # 存入buffer
             self.buffer.push(self._last_obss, actions, rewards, self._last_dones, log_probs, values,  # 正常ppo的
                              controller_result.get_state_values(), controller_result.get_state_values_modified(), )
             
             # 存入监视器
-            self.monitor.collect_ppc_errors(ppc_rewards_errors[:, 1::], save_freq=self.config.monitor_save_freq)
+            # self.monitor.collect_ppc_errors(ppc_rewards_errors[:, 1::], save_freq=self.config.monitor_save_freq)
+            self.monitor.collect_mpc_and_rl(transed_actions, controller_result.get_state_values(), save_freq=self.config.monitor_save_freq)
 
-            self._last_obss = obs_nexts # update observation
-            self._last_dones = dones    # update done
-            curr_step += 1              # update curr step
-            pbar.update(1)              # update pbar
+            self._last_obss = obs_nexts   # update observation
+            self._last_dones = dones      # update done
+            curr_step += 1                # update curr step
+            self.sample_global_steps += 1 # update sample global steps
+            pbar.update(1)                # update pbar
 
         with torch.no_grad():
             values = self.policy.predict_value(converto_torch(obs_nexts))
@@ -220,39 +226,43 @@ class PPO:
         pbar.close()
 
     def _evaluate(self, is_render: bool = False, evaluate_save_path: str = '') -> Tuple:
-        self.policy.eval()
-        # 创建一个新的环境
-        env_eval: SingleEnv = SingleEnv(
-            partial(create_env, self.config.metadriveenv_config),
-            self.config.parallel_env_config,
-        )
-        obs = env_eval.reset()
-
-        # 创建一个新的控制器
-        controller_eval: Controller = Controller(env_eval, self.config.controller_config, eval_mode=True)
-
-        last_done = np.ones(shape=[1, ])
         total_reward = 0.0
-        if is_render: render_row_text = self._create_render_text()
-        
-        for _ in range(self.config.evaluate_total_steps):
-            action, _ = self.predict(obs, deterministic=True)
-            transed_action = self._trans_rl_to_control(action)
-            controller_result, extra_info = controller_eval.control(transed_action, last_done)
-            obs, reward, done, step_info = env_eval.step(controller_result.get_control_values_modified())
+        try:
+            self.policy.eval()
+            # 创建一个新的环境
+            env_eval: SingleEnv = SingleEnv(
+                partial(create_env, self.config.metadriveenv_config),
+                self.config.parallel_env_config,
+            )
+            obs = env_eval.reset()
+
+            # 创建一个新的控制器
+            controller_eval: Controller = Controller(env_eval, self.config.controller_config, eval_mode=True)
+
+            last_done = np.ones(shape=[1, ])
+            if is_render: render_row_text = self._create_render_text()
             
-            total_reward += reward
-            if is_render: self.render_class.add_frame(self._render(render_row_text, env_eval))
+            for _ in range(self.config.evaluate_total_steps):
+                action, _ = self.predict(obs, deterministic=True)
+                transed_action = self._trans_rl_to_control(action)
+                controller_result, extra_info = controller_eval.control(transed_action, last_done, self.sample_global_steps)
+                obs, reward, done, step_info = env_eval.step(controller_result.get_control_values_modified())
+                
+                total_reward += reward
+                if is_render: self.render_class.add_frame(self._render(render_row_text, env_eval))
+                
+                if done:
+                    break
+                
+                last_done = np.array([done], dtype=np.long)
             
-            if done:
-                break
-            
-            last_done = np.array([done], dtype=np.long)
-        
-        if is_render: self.render_class.generate_gif(evaluate_save_path)
-        # 清除用于评估的环境
-        env_eval.close()
-        del env_eval
+            if is_render: self.render_class.generate_gif(evaluate_save_path)
+        except Exception as e:
+            print(e)
+        finally:
+            # 清除用于评估的环境
+            env_eval.close()
+            del env_eval
         return total_reward
     
     def _save(self, evaluate_reward: float, ckp_pth: str):
@@ -343,9 +353,7 @@ class PPO:
 
             if hasattr(self, 'final_evaluate_path'):
                 self.logger.write_tabel_additional_params(['final_evaluate_path'], [os.path.basename(self.final_evaluate_path)])
-
-            with open('dp_single_version2/logger_path.txt', mode='w', encoding='utf-8') as writer:
-                writer.write(self.logger_path)
+            insert_metadata_path('logger_path', self.logger_path) # 插入logger_path
         else:
             self.logger = None
 

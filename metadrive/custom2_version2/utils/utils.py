@@ -2,6 +2,8 @@ import torch
 import numpy as np
 import random
 import os
+from typing import Dict, Union
+import json
 
 def set_random_seed(seed: int, using_cuda: bool = True) -> None:
     random.seed(seed)
@@ -12,8 +14,22 @@ def set_random_seed(seed: int, using_cuda: bool = True) -> None:
         torch.backends.cudnn.deterministic = True
         torch.backends.cudnn.benchmark = False
 
-def get_logger_path(logger_path: str = 'dp_single_version2/logger_path.txt') -> str:
-    if not os.path.exists(logger_path): return ValueError(f'logger path: {logger_path} not exsits!')
-    with open(logger_path, mode='r', encoding='utf-8') as reader:
-        content = reader.read().strip()
-    return content
+
+def insert_metadata_path(key: str, value: Union[str, int, float], metadata_path: str = 'dp_single_version2/metadata.json'):
+    if os.path.exists(metadata_path):
+        with open(metadata_path, mode='r', encoding='utf-8') as reader:
+            content: Dict = json.loads(reader.read())
+    else:
+        content = dict()
+    
+    # insert
+    content[key] = value
+    
+    # re write
+    with open(metadata_path, mode='w', encoding='utf-8') as writer:
+        writer.write(json.dumps(content))
+
+def get_metadata_from_path(metadata_path: str = 'dp_single_version2/metadata.json') -> Dict:
+    if not os.path.exists(metadata_path): raise Exception(f'please get metadata after creating `{metadata_path}`')
+    with open(metadata_path, mode='r', encoding='utf-8') as reader:
+        return json.loads(reader.read())

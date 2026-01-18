@@ -91,18 +91,18 @@ class Controller:
             z_ref = actions[idx, :]
             u_prev = self.controller_result.control_values_prev[idx, :]
 
-            if not self.eval_mode and curr_step is not None:
-                assert isinstance(self.mpc_controller, MPC), 'Type of MPC mismatch!'
-                u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev, curr_step)
-                u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
-                ppc_reward, mpc_error = self._get_ppc_reward_error(z_ref, x_mpc, curr_step)
-                self._check_solve_results(x0, x_mpc[0, :], 'mpc x')
-            elif self.eval_mode and curr_step is None:
-                assert isinstance(self.mpc_controller, MPCEval), 'Type of MPCEval mismatch!'
-                u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev)
-                u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
-                ppc_reward = 0.0; mpc_error = 0.0
-                self._check_solve_results(x0, x_mpc[0, :], 'mpc x')
+            # if not self.eval_mode and curr_step is not None:
+            assert isinstance(self.mpc_controller, MPC), 'Type of MPC mismatch!'
+            u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev, curr_step)
+            u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
+            ppc_reward, mpc_error = self._get_ppc_reward_error(z_ref, x_mpc, curr_step)
+            self._check_solve_results(x0, x_mpc[0, :], 'mpc x')
+            # elif self.eval_mode and curr_step is None:
+            #     assert isinstance(self.mpc_controller, MPCEval), 'Type of MPCEval mismatch!'
+            #     u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev)
+            #     u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
+            #     ppc_reward = 0.0; mpc_error = 0.0
+            #     self._check_solve_results(x0, x_mpc[0, :], 'mpc x')
             
             # 求解修正的控制量
             info, mask = self._filter_info_mask(np.array([state.x, state.y, state.theta]), info, mask, filter_num=self.config.filter_num)
@@ -131,7 +131,8 @@ class Controller:
     def _build_controller(self):
         metadata = self.env.get_metadata()
         self.mpc_config = MPConfig(); self.cbf_config = CBFconfig()
-        self.mpc_controller = MPC(self.mpc_config, metadata) if not self.eval_mode else MPCEval(self.mpc_config, metadata)
+        # self.mpc_controller = MPC(self.mpc_config, metadata) if not self.eval_mode else MPCEval(self.mpc_config, metadata)
+        self.mpc_controller = MPC(self.mpc_config, metadata)
         self.cbf_controller = CBF(self.cbf_config, metadata)
         self.cbf_functions: CBFunctions = CBFunctions(self.cbf_config)
 

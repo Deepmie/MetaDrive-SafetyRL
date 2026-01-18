@@ -88,9 +88,9 @@ class MPC(OCP):
             if k >= 1:
                 if k == 1:
                     zk_e = zk - z_ref
-                    error = zk_e
-                    zeta = self.performetric_func.error_transformation(error, curr_step)
-                    cost += ca.mtimes([P, zeta])
+                    # error = zk_e
+                    # zeta = self.performetric_func.error_transformation(error, curr_step)
+                    # cost += ca.mtimes([P, zeta])
                 else:
                     zk_e = zk - zk_last
                 cost += ca.mtimes([zk_e.T, Q, zk_e])

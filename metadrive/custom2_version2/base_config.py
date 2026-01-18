@@ -6,9 +6,9 @@ from numpy import ndarray
 from typing import Dict, Optional, Tuple
 from metadrive.custom2_version2.type import ActionType
 
-TEST_MODE            = True
+TEST_MODE            = False
 STATE_DIM            = 259
-ACTION_DIM           = 2
+ACTION_DIM           = 4
 TORCH_DTYPE          = torch.float32
 TORCH_DEVICE         = torch.device(device='cuda:0') if torch.cuda.is_available() else torch.device(device='cpu')
 # TORCH_DEVICE         = torch.device(device='cpu')
