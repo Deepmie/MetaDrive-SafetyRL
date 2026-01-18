@@ -27,7 +27,7 @@ EPOCH                = 20
 # MAX_BUFFER_SIZE  = 4096 if not TEST_MODE else 256
 MAX_BUFFER_SIZE      = 4096    if not TEST_MODE else 256
 BATCH_SIZE           = 64
-EVALUATE_STEPS       = 10000  if not TEST_MODE else 50
+EVALUATE_STEPS       = 50000  if not TEST_MODE else 50
 EVALUATE_TOTAL_STEPS = 2000
 TOTAL_STEPS          = 2000000 if not TEST_MODE else 9000
 
