@@ -288,7 +288,7 @@ class PPO:
         else:
             pi_action = self.policy.act_mean(obss[bc_index])
             omega = 1 + torch.exp(torch.norm(z_cbfs[bc_index] - z_mpcs[bc_index], p=2, dim=1))
-            bc_loss = (omega * torch.norm(z_cbfs[bc_index] - pi_action, p=2, dim=1)).mean()
+            bc_loss = (omega * torch.norm(z_cbfs[bc_index] - pi_action[:, 0: 2], p=2, dim=1)).mean()
 
         policy_loss = standard_loss + self.config.bc_coef * bc_loss
         return policy_loss
@@ -334,8 +334,7 @@ class PPO:
         new_actions = np.empty_like(actions)
         new_actions[:, 0] = self._renorm(clipped_actions[:, 0], self.config.v_max, self.config.v_min)
         new_actions[:, 1] = self._renorm(clipped_actions[:, 1], self.config.theta_max, self.config.theta_min)
-        new_actions[:, 2] = self._renorm(clipped_actions[:, 2], self.config.p_inf_max, self.config.p_inf_min)
-        new_actions[:, 3] = self._renorm(clipped_actions[:, 3], self.config.lota_max, self.config.lota_min)
+        new_actions[:, 2] = self._renorm(clipped_actions[:, 2], self.config.alpha_min, self.config.alpha_max)
         return new_actions
     
     def _renorm(self, v: ndarray, v_max: float, v_min: float) -> ndarray: # 反归一化函数

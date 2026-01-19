@@ -14,14 +14,12 @@ class PerformetricFunc:
         self.config = config
         self._set_attr()
     
-    def error_transformation(self, error: float, step: int) -> float:
-        p: float = self.caculate(step)
-        error_norm: float = error / (p * self.delta_L)
-        # return 1 / 2 * np.log((error_norm + self.delta_L) / (self.delta_R - error_norm))
-        return np.exp(self.alpha * error_norm ** 2) - 1
+    def error_transformation(self, error: float, Q: ndarray, p_inf: float, lota: float, step: int) -> float:
+        p: float = self.caculate(p_inf, lota, step)
+        return ca.mtimes([error.T, Q, error]) * (1 / p**2)
 
-    def caculate(self, step: int) -> float:
-        return (self.p_0 - self.p_inf) * np.exp(-self.lota * step) + self.p_inf
+    def caculate(self, p_inf: float, lota: float, step: int) -> float:
+        return (self.p_0 - p_inf) * np.exp(-lota * step) + p_inf
 
     def show_explot(self, total_step: int = 10000, errors: Optional[ndarray] = None):
         # simulate
@@ -62,8 +60,6 @@ class PerformetricFunc:
 
     def _set_attr(self):
         self.p_0   = self.config.p_0
-        self.p_inf = self.config.p_inf
-        self.lota  = self.config.lota
         self.delta_L = self.config.delta_L
         self.delta_R = self.config.delta_R
         self.alpha   = self.config.alpha
@@ -75,15 +71,17 @@ class PerformetricFuncCasadi:
         self.config = config
         self._set_attr()
     
-    def error_transformation(self, error, Q, p_inf, lota, step):
-        p = self.caculate(p_inf, lota, step)
+    def error_transformation(self, error, Q, alpha):
+        p = self.caculate(alpha)
         return ca.mtimes([error.T, Q, error]) * (1 / p**2)
 
-    def caculate(self, p_inf, lota, step):
-        return (self.p_0 - p_inf) * ca.exp(-lota * step) + p_inf
+    def caculate(self, p, alpha):
+        # return (self.p_0 - p_inf) * ca.exp(-lota * step) + p_inf
+        return alpha * self.p_0 + (1 - alpha) * self.p_inf
     
     def _set_attr(self):
         self.p_0     = DM(self.config.p_0)
+        self.p_inf   = DM(self.config.p_inf)
         self.delta_L = DM(self.config.delta_L)
         self.delta_R = DM(self.config.delta_R)
         self.alpha   = DM(self.config.alpha)

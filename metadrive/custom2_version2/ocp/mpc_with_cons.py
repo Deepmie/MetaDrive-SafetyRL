@@ -19,7 +19,7 @@ class MPC(OCP):
         self.config: MPConfig = cast(MPConfig, self.config)
         self.performetric_func: PerformetricFuncCasadi = PerformetricFuncCasadi(self.config)
     
-    def __call__(self, x0, z_ref, u_prev, p) -> Tuple[ndarray, ndarray]:
+    def __call__(self, x0, z_ref, u_prev, p_inf, lota, curr_step) -> Tuple[ndarray, ndarray]:
         '''
         x0: 当前车辆的状态: [横坐标x, 纵坐标y, 车辆速度v, 车辆角度theta],
         z_ref: 车辆的跟踪轨迹: [参考速度v_ref, 参考角度theta_ref],
@@ -28,7 +28,7 @@ class MPC(OCP):
         lota: 收紧速率
         curr_step: 当前所处的阶段: 一个标量
         '''
-        res: Dict = super(MPC, self).__call__(x0, z_ref, u_prev, p)
+        res: Dict = super(MPC, self).__call__(x0, z_ref, u_prev, p_inf, lota, curr_step)
         return self._parse_result(res)
 
     def _build_numeric_problem(self):
@@ -45,8 +45,12 @@ class MPC(OCP):
         ])
 
         # 设定约束条件的上下界
-        lbg = np.zeros(self._nlp_metadata['g_dim'])
-        ubg = np.zeros(self._nlp_metadata['g_dim'])
+        lbg = np.zeros(self._nlp_metadata['g_equal_dim'] + self._nlp_metadata['g_unequal_dim'])
+        # ubg = np.zeros(self._nlp_metadata['g_dim'])
+        ubg = np.concatenate([
+            np.zeros(self._nlp_metadata['g_equal_dim']),
+            np.inf * np.ones(self._nlp_metadata['g_unequal_dim']),
+        ])
 
         self._num_prob = {'x0': w0, 'lbx': lbw, 'ubx': ubw, 'lbg': lbg, 'ubg': ubg, }
 
@@ -59,7 +63,9 @@ class MPC(OCP):
         x0        = MX.sym('x0', self.config.nx)
         z_ref     = MX.sym('z_ref', 2)
         u_prev    = MX.sym('u_prev', self.config.nu)
-        p         = MX.sym('p', 1)
+        p_inf     = MX.sym('p_inf', 1)
+        lota      = MX.sym('lota', 1)
+        curr_step = MX.sym('curr_step', 1)
 
         Q  = DM(np.diag([5, 50])) # error
         R  = DM(np.diag([1, 1]))  # cost
@@ -90,10 +96,12 @@ class MPC(OCP):
             if k >= 1:
                 if k == 1:
                     zk_e = zk - z_ref
+                    p = self.performetric_func.caculate(p_inf, lota, curr_step)
+                    g.append(p - ca.mtimes([zk_e.T, Q, zk_e]))
                 else:
-                    # zk_e = zk - zk_last
-                    zk_e = zk - z_ref
-                cost += ca.mtimes([zk_e.T, Q, zk_e]) / p**2
+                    zk_e = zk - zk_last
+                # cost += self.performetric_func.error_transformation(zk_e, Q, p_inf, lota, curr_step)
+                cost += ca.mtimes([zk_e.T, Q, zk_e])
             
             cost += ca.mtimes([uk.T, R, uk])
             
@@ -109,7 +117,7 @@ class MPC(OCP):
             'x': ca.vertcat(U, X),
             'f': cost,
             'g': ca.vertcat(*g),
-            'p': ca.vertcat(x0, z_ref, u_prev, p)
+            'p': ca.vertcat(x0, z_ref, u_prev, p_inf, lota, curr_step)
         }
 
         self._nlp_metadata = \
@@ -117,7 +125,8 @@ class MPC(OCP):
             'w_dim': U.shape[0] + X.shape[0],
             'u_dim': U.shape[0],
             'x_dim': X.shape[0],
-            'g_dim': (self.config.np + 1) * self.config.nx,
+            'g_equal_dim': (self.config.np + 1) * self.config.nx,
+            'g_unequal_dim': 1,
         }
 
     def _define_state_update_equation(self):

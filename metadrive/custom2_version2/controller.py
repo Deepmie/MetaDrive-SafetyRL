@@ -79,7 +79,7 @@ class Controller:
         self.controller_result = ControllerResult(self.config, eval_mode=eval_mode)
         self._build_controller()
         self.performetric_func: PerformetricFunc = PerformetricFunc(self.mpc_config)
-        self.episode_steps = np.zeros([self._num, 1], dtype=np.float32)
+        self.performetrics: ndarray = self.mpc_config.p_0 * np.ones([self._num, 1], dtype=np.float32)
 
     def control(self, actions: ndarray, dones: ndarray) -> Tuple[ControllerResult, Union[Dict]]:
         # 获得初始状态
@@ -89,18 +89,20 @@ class Controller:
         self.controller_result.reset()
 
         # ====== update if done include `True` ===== #
-        self.episode_steps *= 1 - dones.reshape(-1, 1) #如果当前步已经完成了
         self.controller_result.update_control_values_prev(dones)
+        dones_index: ndarray = np.array(dones == 1).flatten()
+        self.performetrics[dones_index, :] = self.mpc_config.p_0 * np.ones([dones_index.sum(), 1])
         # ========================================== #
         
         for idx, (state, info, mask, ) in enumerate(zip(vehicle_states_init, infos, masks)):
             x0 = np.array([state.x, state.y, state.v, state.theta])
-            z_ref = actions[idx, 0: 2]; p_inf = actions[idx, 2: 3]; lota = actions[idx, 3::]; episode_step = self.episode_steps[idx, :]
+            z_ref = actions[idx, 0: 2]; alpha = actions[idx, 2: 3]
             u_prev = self.controller_result.control_values_prev[idx, :]
-
+            # update performetrics
+            self.performetrics[idx, 0] = alpha * self.performetrics[idx, 0] + (1 - alpha) * self.mpc_config.p_inf
             # if not self.eval_mode and curr_step is not None:
             assert isinstance(self.mpc_controller, MPC), 'Type of MPC mismatch!'
-            u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev, p_inf, lota, episode_step)
+            u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev, self.performetrics[idx, 0: 1])
             u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
             # ppc_reward, mpc_error = self._get_ppc_reward_error(z_ref, x_mpc, curr_step)
             ppc_reward, mpc_error = 0.0, 0.0
@@ -132,7 +134,6 @@ class Controller:
             else:
                 extra_info = None
         
-        self.episode_steps += 1 # 整体add 1
         return deepcopy(self.controller_result), extra_info
 
     def _build_controller(self):
