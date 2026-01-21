@@ -5,6 +5,7 @@ from metadrive.custom2_version2.ocp.performance_metric_func import PerformetricF
 from metadrive.custom2_version2.envs import ParallelEnv, SingleEnv
 from metadrive.custom2_version2.type import VehicleState
 from metadrive.custom2_version2.base_config import ControllerConfig
+from metadrive.custom2_version2.traj_generator import TrajGenerator
 from typing import List, Dict, Tuple, Union, cast, Optional
 import numpy as np
 from numpy import ndarray
@@ -89,17 +90,16 @@ class Controller:
 
         # ====== update if done include `True` ===== #
         self.controller_result.update_control_values_prev(dones)
-        dones_index: ndarray = np.array(dones == 1).flatten()
-        self.performetrics[dones_index, :] = self.mpc_config.p_0 * np.ones([dones_index.sum(), 1])
         # ========================================== #
         
         for idx, (state, info, mask, ) in enumerate(zip(vehicle_states_init, infos, masks)):
             x0 = np.array([state.x, state.y, state.v, state.theta])
-            z_ref = actions[idx, 0: 2]; alpha = actions[idx, 2: 3]
+            state_ref = actions[idx, 0: 2]
             u_prev = self.controller_result.control_values_prev[idx, :]
             # update performetrics
-            self.performetrics[idx, 0] = alpha * self.performetrics[idx, 0] + (1 - alpha) * self.mpc_config.p_inf
+
             # if not self.eval_mode and curr_step is not None:
+            z_ref: ndarray = self.traj_generator.generate(state.theta, state_ref)
             assert isinstance(self.mpc_controller, MPC), 'Type of MPC mismatch!'
             u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev, self.performetrics[idx, 0: 1])
             u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
@@ -145,6 +145,7 @@ class Controller:
         self.mpc_config = MPConfig(); self.cbf_config = CBFconfig()
         self.mpc_controller = MPC(self.mpc_config, metadata)
         self.cbf_controller = CBF(self.cbf_config, metadata)
+        self.traj_generator = TrajGenerator(self.mpc_config)
         self.cbf_functions: CBFunctions = CBFunctions(self.cbf_config)
 
     def _get_vehicle_state(self) -> List[VehicleState]:

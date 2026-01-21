@@ -93,11 +93,11 @@ class PPO:
             #     if evaluate_reward > best_reward: self._save(evaluate_reward=evaluate_reward, ckp_pth=self.best_policy_checkpoint_pth); best_reward = evaluate_reward
             #     self.logger.write_reward(evaluate_reward, best_reward=best_reward)
             #     evaluate_idx += 1
-
+            
             #     self._save(evaluate_reward=evaluate_reward, ckp_pth=self.policy_checkpoint_pth)
             
             # 每步都评估
-            if True:
+            if self.num_steps >= (evaluate_idx + 1) * self.config.evaluate_steps:
                 evaluate_reward = self._evaluate()
                 if evaluate_reward > best_reward: self._save(evaluate_reward=evaluate_reward, ckp_pth=self.best_policy_checkpoint_pth); best_reward = evaluate_reward
                 self.logger.write_stand_reward(evaluate_reward)
@@ -343,7 +343,6 @@ class PPO:
         new_actions = np.empty_like(actions)
         new_actions[:, 0] = self._renorm(clipped_actions[:, 0], self.config.v_max, self.config.v_min)
         new_actions[:, 1] = self._renorm(clipped_actions[:, 1], self.config.theta_max, self.config.theta_min)
-        new_actions[:, 2] = self._renorm(clipped_actions[:, 2], self.config.alpha_min, self.config.alpha_max)
         return new_actions
     
     def _renorm(self, v: ndarray, v_max: float, v_min: float) -> ndarray: # 反归一化函数

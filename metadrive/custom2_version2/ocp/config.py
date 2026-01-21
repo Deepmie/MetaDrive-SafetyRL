@@ -15,8 +15,8 @@ class IpoptConfig:
     mu_init: float                    = 1e-2
     tol: float                        = 1e-4
     acceptable_tol: float             = 1e-3
-    max_iter: int                     = 50
-    acceptable_iter: int              = 5
+    max_iter: int                     = 500
+    acceptable_iter: int              = 100
     linear_solver: str                = 'mumps'  # 可以尝试'ma27', 'ma57', 'ma86'
 
 
@@ -41,7 +41,7 @@ class OptimConfig:
 @dataclass
 class OCPconfig:
     np: int                   = 5         # step的数量
-    mu: int                   = 5         # u的控制时域
+    mu: int                   = 5         # u的控制时域, mu>=np, 失效
     nx: int                   = 4         # 状态的维度, [x, y, v, theta]
     nu: int                   = 2         # 控制的维度, [a, delta]
     Ts: int                   = 0.02 * 5  # 周期

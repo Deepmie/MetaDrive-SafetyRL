@@ -24,8 +24,6 @@ class MPC(OCP):
         x0: 当前车辆的状态: [横坐标x, 纵坐标y, 车辆速度v, 车辆角度theta],
         z_ref: 车辆的跟踪轨迹: [参考速度v_ref, 参考角度theta_ref],
         u_prev: 上一次的控制值: [加速度a_prev, 转向角delta_prev],
-        p_inf: 收紧的最小值
-        lota: 收紧速率
         curr_step: 当前所处的阶段: 一个标量
         '''
         res: Dict = super(MPC, self).__call__(x0, z_ref, u_prev, p)
@@ -53,11 +51,11 @@ class MPC(OCP):
     def _caculate_cost_and_conditions(self):
         # ------- 添加决策变量 ----- #
         U = MX.sym('U', self.config.nu * self.config.mu)
-        X = MX.sym('X', self.config.nx * (self.config.np + 1))
+        X = MX.sym('X', self.config.nx * (self.config.np+1))
 
         # -------- 添加常量 ------- #
         x0        = MX.sym('x0', self.config.nx)
-        z_ref     = MX.sym('z_ref', 2)
+        z_ref     = MX.sym('z_ref', 2 * (self.config.np + 1))
         u_prev    = MX.sym('u_prev', self.config.nu)
         p         = MX.sym('p', 1)
 
@@ -71,43 +69,30 @@ class MPC(OCP):
         
         g.append(X[0: self.config.nx] - x0)
         u_prev_sym = u_prev
-        for k in range(self.config.np):
-            xk = X[k * self.config.nx: (k+1) * self.config.nx]
-            
-            if k < self.config.mu:
-                uk = U[k * self.config.nu: (k+1) * self.config.nu]
-            else:
-                uk = U[(self.config.mu - 1) * self.config.nu: self.config.mu * self.config.nu]
-            
-            zk = xk[2::] # 取x的后两项
-            
-            # 状态更新
-            xk_next = self._f(xk, uk)
 
-            # 约束和代价更新
-            g.append(X[(k+1) * self.config.nx: (k+2) * self.config.nx] - xk_next)
-
+        for k in range(0, self.config.np): # k_max = np-1, cons_u~k = mu-1
+            xk = X[k * self.config.nx: (k + 1) * self.config.nx]
+            uk = U[k * self.config.nu: (k + 1) * self.config.nu] if k < self.config.mu else U[(self.config.mu - 1) * self.config.nu: self.config.mu * self.config.nu]
+            # 状态转移 & 添加约束进来
+            xk_next = self._f(xk, uk); g.append(X[(k + 1) * self.config.nx: (k + 2) * self.config.nx] - xk_next)
+            
             if k >= 1:
-                if k == 1:
-                    zk_e = zk - z_ref
-                else:
-                    # zk_e = zk - zk_last
-                    zk_e = zk - z_ref
-                
-                error_trans = ca.mtimes([zk_e.T, Q, zk_e]) / p
-                cost += error_trans / self.config.delta_L
-                # ca.log(1 + (error_trans / self.config.delta_L) ** 2)
-                # (self.config.delta_L ** 2) * ca.log(ca.cosh(error_trans / self.config.delta_L))
-                # 1 / 2 * ca.log((error_trans + self.config.delta_L) / (self.config.delta_R - error_trans))
-            
+                zk_e = xk[2::] - z_ref[k * 2: (k + 1) * 2]
+                error_trans = ca.mtimes([zk_e.T, Q, zk_e])
+                cost += error_trans
+                    # ca.log(1 + (error_trans / self.config.delta_L) ** 2)
+                    # (self.config.delta_L ** 2) * ca.log(ca.cosh(error_trans / self.config.delta_L))
+                    # 1 / 2 * ca.log((error_trans + self.config.delta_L) / (self.config.delta_R - error_trans))
             cost += ca.mtimes([uk.T, R, uk])
-            
-            du = uk - u_prev_sym
-            cost += ca.mtimes([du.T, Rd, du])
-            
-            # 控制变量更新
+
+            # duk = uk - u_prev_sym
+            # cost += ca.times([duk.T, Rd, duk])
+
+            # update control varible #
             u_prev_sym = uk
-            zk_last    = zk
+        
+        zk_e_terminal = xk_next[2::] - z_ref[(self.config.np-1) * 2 : self.config.np * 2]
+        cost += ca.mtimes([zk_e_terminal.T, Q, zk_e_terminal])
         
         self._nlp = \
         {
