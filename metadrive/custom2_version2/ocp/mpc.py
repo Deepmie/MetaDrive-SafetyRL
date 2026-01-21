@@ -6,6 +6,7 @@ from typing import Tuple, Dict, cast
 from metadrive.custom2_version2.ocp.config import MPConfig
 from metadrive.custom2_version2.ocp.base import OCP
 from metadrive.custom2_version2.ocp.performance_metric_func import PerformetricFuncCasadi
+from metadrive.component.vehicle.default_vehicle import DefaultVehicle
 
 class MPC(OCP):
     def __init__(self, config: MPConfig, metadata: Dict):
