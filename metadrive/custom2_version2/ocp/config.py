@@ -15,8 +15,8 @@ class IpoptConfig:
     mu_init: float                    = 1e-2
     tol: float                        = 1e-4
     acceptable_tol: float             = 1e-3
-    max_iter: int                     = 50
-    acceptable_iter: int              = 5
+    max_iter: int                     = 500
+    acceptable_iter: int              = 100
     linear_solver: str                = 'mumps'  # 可以尝试'ma27', 'ma57', 'ma86'
 
 
@@ -40,15 +40,15 @@ class OptimConfig:
 
 @dataclass
 class OCPconfig:
-    np: int                   = 5         # step的数量
-    mu: int                   = 5         # u的控制时域
+    np: int                   = 3         # step的数量
+    mu: int                   = 3         # u的控制时域
     nx: int                   = 4         # 状态的维度, [x, y, v, theta]
     nu: int                   = 2         # 控制的维度, [a, delta]
     Ts: int                   = 0.02 * 5  # 周期
-    a_min: float              = -2        # a的最小控制值
-    a_max: float              = 2         # a的最大控制值
-    delta_min: float          = -pi / 4   # delta的最小控制值
-    delta_max: float          =  pi / 4   # delta的最大控制值
+    a_min: float              = -1        # a的最小控制值
+    a_max: float              = 1         # a的最大控制值
+    delta_min: float          = -pi / 6   # delta的最小控制值
+    delta_max: float          =  pi / 6   # delta的最大控制值
     optim_config: OptimConfig = field(default_factory=OptimConfig)
 
 
@@ -57,8 +57,8 @@ class MPConfig(OCPconfig):
     delta_L: float = 1
     delta_R: float = 1
     alpha: float   = 0.2
-    p_0: float     = 10
-    p_inf: float   = 1
+    p_0: float     = 5
+    p_inf: float   = 0.5
     lota: float    = 1e-4
 
 

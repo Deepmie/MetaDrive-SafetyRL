@@ -97,7 +97,7 @@ class PPO:
             #     self._save(evaluate_reward=evaluate_reward, ckp_pth=self.policy_checkpoint_pth)
             
             # 每步都评估
-            if True:
+            if self.num_steps >= (evaluate_idx + 1) * self.config.evaluate_steps:
                 evaluate_reward = self._evaluate()
                 if evaluate_reward > best_reward: self._save(evaluate_reward=evaluate_reward, ckp_pth=self.best_policy_checkpoint_pth); best_reward = evaluate_reward
                 self.logger.write_stand_reward(evaluate_reward)

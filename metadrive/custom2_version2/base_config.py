@@ -151,7 +151,7 @@ class PPOConfig:
     v_max: float                     = 15.0
     theta_min: float                 = -np.pi / 3
     theta_max: float                 =  np.pi / 3
-    alpha_min: float                 = 0.8
+    alpha_min: float                 = 0.1
     alpha_max: float                 = 1.0
     # p_inf_min: float                 = 0.1
     # p_inf_max: float                 = 1.0
