@@ -28,7 +28,7 @@ EPOCH                = 20
 MAX_BUFFER_SIZE      = 4096    if not TEST_MODE else 256
 BATCH_SIZE           = 64
 EVALUATE_STEPS       = 10000  if not TEST_MODE else 50
-EVALUATE_TOTAL_STEPS = 2000
+EVALUATE_TOTAL_STEPS = 10
 TOTAL_STEPS          = 2000000 if not TEST_MODE else 9000
 
 
@@ -141,6 +141,7 @@ class PPOConfig:
     entropy_coef: float              = 0.0
     bc_coef: float                   = 1.0
     value_loss_coef: float           = 0.5
+    lambda_coef: float               = 0.2
     learning_rate: float             = 3e-4
     max_grad_norm: float             = 0.5
     action_space_range: Tuple        = (-1, 1)
@@ -150,7 +151,7 @@ class PPOConfig:
     v_max: float                     = 15.0
     theta_min: float                 = -np.pi / 3
     theta_max: float                 =  np.pi / 3
-    alpha_min: float                 = 0.0
+    alpha_min: float                 = 0.8
     alpha_max: float                 = 1.0
     # p_inf_min: float                 = 0.1
     # p_inf_max: float                 = 1.0

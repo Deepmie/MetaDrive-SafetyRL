@@ -45,17 +45,17 @@ class OCPconfig:
     nx: int                   = 4         # 状态的维度, [x, y, v, theta]
     nu: int                   = 2         # 控制的维度, [a, delta]
     Ts: int                   = 0.02 * 5  # 周期
-    a_min: float              = -1        # a的最小控制值
-    a_max: float              = 1         # a的最大控制值
-    delta_min: float          = -pi / 6   # delta的最小控制值
-    delta_max: float          =  pi / 6   # delta的最大控制值
+    a_min: float              = -2        # a的最小控制值
+    a_max: float              = 2         # a的最大控制值
+    delta_min: float          = -pi / 4   # delta的最小控制值
+    delta_max: float          =  pi / 4   # delta的最大控制值
     optim_config: OptimConfig = field(default_factory=OptimConfig)
 
 
 @dataclass
 class MPConfig(OCPconfig):
-    delta_L: float = 0.5
-    delta_R: float = 0.5
+    delta_L: float = 1
+    delta_R: float = 1
     alpha: float   = 0.2
     p_0: float     = 10
     p_inf: float   = 1

@@ -93,7 +93,12 @@ class MPC(OCP):
                 else:
                     # zk_e = zk - zk_last
                     zk_e = zk - z_ref
-                cost += ca.mtimes([zk_e.T, Q, zk_e]) / p**2
+                
+                error_trans = ca.mtimes([zk_e.T, Q, zk_e]) / p
+                cost += error_trans / self.config.delta_L
+                # ca.log(1 + (error_trans / self.config.delta_L) ** 2)
+                # (self.config.delta_L ** 2) * ca.log(ca.cosh(error_trans / self.config.delta_L))
+                # 1 / 2 * ca.log((error_trans + self.config.delta_L) / (self.config.delta_R - error_trans))
             
             cost += ca.mtimes([uk.T, R, uk])
             

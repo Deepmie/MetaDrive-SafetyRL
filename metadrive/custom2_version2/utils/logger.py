@@ -38,12 +38,14 @@ class Logger:
         
         # =================日志路径名================= #
         logger_path: str           = os.path.join(config.logger_path_root, 'log_{}'.format(self.now_datetime.strftime("%Y_%m_%d_%H_%M_%S")))
+        reward_path: str           = os.path.join(logger_path, 'record_reward.txt')
         record_path: str           = os.path.join(logger_path, 'record_rl_reward.txt')
         cbf_ratio_record_path: str = os.path.join(logger_path, 'record_cbf_ratio.txt')
         # ========================================== #
         
         os.mkdir(logger_path) # 创建文件夹
         self.logger_path = logger_path
+        self.reward_file = open(reward_path, mode='w', encoding='utf-8')
         self.record_file = open(record_path, mode='w', encoding='utf-8')
         self.ratio_record_file = open(cbf_ratio_record_path, mode='w', encoding='utf-8')
 
@@ -112,6 +114,9 @@ class Logger:
             self._write(self._get_line_string())
         
         self._reward_index += 1
+
+    def write_stand_reward(self, reward_value: float):
+        self._write(f'{reward_value}\n', file_name='reward')
 
     def write_time(self, time_result: Dict, process_name: Optional[str]):
         self._write(f'\n{process_name}\'s time recorded: \n')

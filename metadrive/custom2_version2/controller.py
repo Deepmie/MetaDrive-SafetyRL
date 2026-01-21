@@ -24,15 +24,14 @@ class ControllerResult:
         self.state_values_modified   = np.empty([self._num, self.config.vehicle_state_dim])
         self.control_values          = np.empty([self._num, self.config.control_dim])
         self.control_values_modified = np.empty([self._num, self.config.control_dim])
-        self.ppc_rewards_errors      = np.empty([self._num, 3])
+        self.performetrics           = np.empty([self._num, 1])
     
-    def push(self, x_mpc: ndarray, x_cbf: ndarray, u_mpc: ndarray, u_cbf: ndarray, ppc_reward: ndarray, mpc_error: ndarray):
+    def push(self, x_mpc: ndarray, x_cbf: ndarray, u_mpc: ndarray, u_cbf: ndarray, performetric: ndarray):
         self.state_values[self._env_idx, :]             = x_mpc
         self.state_values_modified[self._env_idx, :]    = x_cbf
         self.control_values[self._env_idx, :]           = u_mpc
         self.control_values_modified[self._env_idx, :]  = u_cbf
-        self.ppc_rewards_errors[self._env_idx, 0]       = ppc_reward
-        self.ppc_rewards_errors[self._env_idx, 1::]     = mpc_error
+        self.performetrics[self._env_idx, :]            = performetric
         self._env_idx += 1
 
     def update_control_values_prev(self, dones: ndarray):
@@ -65,8 +64,8 @@ class ControllerResult:
         if self.eval_mode: res = res.flatten()
         return res
     
-    def get_ppc_rewards_errors(self) -> ndarray:
-        return self.ppc_rewards_errors
+    def get_performetrics(self) -> ndarray:
+        return self.performetrics
 
 
 
@@ -105,8 +104,13 @@ class Controller:
             u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev, self.performetrics[idx, 0: 1])
             u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
             # ppc_reward, mpc_error = self._get_ppc_reward_error(z_ref, x_mpc, curr_step)
-            ppc_reward, mpc_error = 0.0, 0.0
-            self._check_solve_results(x0, x_mpc[0, :], 'mpc x')
+            # ppc_reward, mpc_error = 0.0, 0.0
+
+            if not bool(solve_info_mpc.get('success')):
+                raise Exception('MPC solve infeasible!')
+            else:
+                self._check_solve_results(x0, x_mpc[0, :], 'mpc x')
+            
             # elif self.eval_mode and curr_step is None:
             #     assert isinstance(self.mpc_controller, MPCEval), 'Type of MPCEval mismatch!'
             #     u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev)
@@ -126,7 +130,7 @@ class Controller:
                 # self._check_solve_results(u_mpc[0, :], u_cbf[0, :], 'cbf u')
             
             # 存入结果类中
-            self.controller_result.push(x_mpc[1, :], x_cbf[1, :], u_mpc[0, :], u_cbf[0, :], ppc_reward, mpc_error)
+            self.controller_result.push(x_mpc[1, :], x_cbf[1, :], u_mpc[0, :], u_cbf[0, :], self.performetrics[idx, 0])
             
             if self.eval_mode:
                 extra_info: Dict = self._get_extra_test_info(x0, info, state, u_cbf)

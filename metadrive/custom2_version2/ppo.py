@@ -87,14 +87,22 @@ class PPO:
             print('\nstart to train...')
             self._train()
             
-            if self.num_steps >= (evaluate_idx + 1) * self.config.evaluate_steps:
-                print('\nstart to evaluate & save...')
+            # if self.num_steps >= (evaluate_idx + 1) * self.config.evaluate_steps:
+            #     print('\nstart to evaluate & save...')
+            #     evaluate_reward = self._evaluate()
+            #     if evaluate_reward > best_reward: self._save(evaluate_reward=evaluate_reward, ckp_pth=self.best_policy_checkpoint_pth); best_reward = evaluate_reward
+            #     self.logger.write_reward(evaluate_reward, best_reward=best_reward)
+            #     evaluate_idx += 1
+
+            #     self._save(evaluate_reward=evaluate_reward, ckp_pth=self.policy_checkpoint_pth)
+            
+            # 每步都评估
+            if True:
                 evaluate_reward = self._evaluate()
                 if evaluate_reward > best_reward: self._save(evaluate_reward=evaluate_reward, ckp_pth=self.best_policy_checkpoint_pth); best_reward = evaluate_reward
-                self.logger.write_reward(evaluate_reward, best_reward=best_reward)
+                self.logger.write_stand_reward(evaluate_reward)
                 evaluate_idx += 1
-
-                self._save(evaluate_reward=evaluate_reward, ckp_pth=self.policy_checkpoint_pth)
+                if evaluate_idx % 100 == 0: self.monitor.plot_rewards()
         
         self._start_successful = True
         start_info = 'Successful!'
@@ -146,6 +154,7 @@ class PPO:
             rewards = self._bootstraping(rewards, dones, step_infos)
             # ppc_rewards_errors: ndarray = controller_result.get_ppc_rewards_errors()
             # rewards += ppc_rewards_errors[:, 0]
+            # rewards += -self.config.lambda_coef * controller_result.get_performetrics()
             
             # 存入buffer
             self.buffer.push(self._last_obss, actions, rewards, self._last_dones, log_probs, values,  # 正常ppo的
@@ -341,6 +350,7 @@ class PPO:
         return (v + 1) / 2 * (v_max - v_min) + v_min
     
     def _create_logger(self):
+        record_path: str = 'dp_single_version2/logger_path.txt'
         if not self.eval_mode:
             self.logger: Logger   = Logger(self.config.logger_config)
             self.logger_path: str = self.logger.get_logger_path().strip()
@@ -348,10 +358,13 @@ class PPO:
             if hasattr(self, 'final_evaluate_path'):
                 self.logger.write_tabel_additional_params(['final_evaluate_path'], [os.path.basename(self.final_evaluate_path)])
 
-            with open('dp_single_version2/logger_path.txt', mode='w', encoding='utf-8') as writer:
+            with open(record_path, mode='w', encoding='utf-8') as writer:
                 writer.write(self.logger_path)
         else:
             self.logger = None
+            with open(record_path, mode='r', encoding='utf-8') as reader:
+                content: str = str(reader.read().strip()) 
+            self.logger_path: str = content
 
 
 
