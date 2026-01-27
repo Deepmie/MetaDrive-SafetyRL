@@ -69,7 +69,7 @@ class MPC(OCP):
         
         g.append(X[0: self.config.nx] - x0)
         u_prev_sym = u_prev
-
+        
         for k in range(0, self.config.np): # k_max = np-1, cons_u~k = mu-1
             xk = X[k * self.config.nx: (k + 1) * self.config.nx]
             uk = U[k * self.config.nu: (k + 1) * self.config.nu] if k < self.config.mu else U[(self.config.mu - 1) * self.config.nu: self.config.mu * self.config.nu]

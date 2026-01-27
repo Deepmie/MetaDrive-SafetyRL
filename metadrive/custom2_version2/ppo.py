@@ -49,7 +49,7 @@ class PPO:
         self.controller: Controller      = Controller(self.env, self.config.controller_config, eval_mode=False)
         self.timer: Timer                = Timer()
         self.render_class: RenderClass   = RenderClass()
-        self.monitor: Monitor            = Monitor(self.logger_path)
+        self.monitor: Monitor            = Monitor(self.config.method_name)
         
         self.schedule    = ConstantSchedule(self.config.epsilon)
 
@@ -87,22 +87,15 @@ class PPO:
             print('\nstart to train...')
             self._train()
             
-            # if self.num_steps >= (evaluate_idx + 1) * self.config.evaluate_steps:
-            #     print('\nstart to evaluate & save...')
-            #     evaluate_reward = self._evaluate()
-            #     if evaluate_reward > best_reward: self._save(evaluate_reward=evaluate_reward, ckp_pth=self.best_policy_checkpoint_pth); best_reward = evaluate_reward
-            #     self.logger.write_reward(evaluate_reward, best_reward=best_reward)
-            #     evaluate_idx += 1
-            
-            #     self._save(evaluate_reward=evaluate_reward, ckp_pth=self.policy_checkpoint_pth)
-            
-            # 每步都评估
             if self.num_steps >= (evaluate_idx + 1) * self.config.evaluate_steps:
+                print('\nstart to evaluate & save...')
                 evaluate_reward = self._evaluate()
                 if evaluate_reward > best_reward: self._save(evaluate_reward=evaluate_reward, ckp_pth=self.best_policy_checkpoint_pth); best_reward = evaluate_reward
-                self.logger.write_stand_reward(evaluate_reward)
+                self.logger.write_reward(evaluate_reward, best_reward=best_reward)
+                self.monitor.collect_evaluate_reward(evaluate_reward)
                 evaluate_idx += 1
-                if evaluate_idx % 100 == 0: self.monitor.plot_rewards()
+                # self._save(evaluate_reward=evaluate_reward, ckp_pth=self.policy_checkpoint_pth)
+            
         
         self._start_successful = True
         start_info = 'Successful!'
@@ -125,6 +118,7 @@ class PPO:
     
     def close(self):
         self.env.close()
+        self.monitor.close()
         # self.env_eval.close()
         if hasattr(self, 'logger') and self.logger is not None: self.logger.close()
 
@@ -152,16 +146,13 @@ class PPO:
             
             obs_nexts, rewards, dones, step_infos = self.env.step(controller_result.get_control_values_modified())
             rewards = self._bootstraping(rewards, dones, step_infos)
-            # ppc_rewards_errors: ndarray = controller_result.get_ppc_rewards_errors()
-            # rewards += ppc_rewards_errors[:, 0]
-            # rewards += -self.config.lambda_coef * controller_result.get_performetrics()
             
             # 存入buffer
             self.buffer.push(self._last_obss, actions, rewards, self._last_dones, log_probs, values,  # 正常ppo的
                              controller_result.get_state_values(), controller_result.get_state_values_modified(), )
             
             # 存入监视器
-            # self.monitor.collect_ppc_errors(ppc_rewards_errors[:, 1::], save_freq=self.config.monitor_save_freq)
+            self.monitor.collect_rewards(rewards, dones)
 
             self._last_obss = obs_nexts # update observation
             self._last_dones = dones    # update done

@@ -6,6 +6,7 @@ from numpy import ndarray
 from typing import Dict, Optional, Tuple
 from metadrive.custom2_version2.type import ActionType
 
+METHOD_NAME          = 'rl_mpc_cbf_traj'
 TEST_MODE            = False
 STATE_DIM            = 259
 ACTION_DIM           = 2
@@ -27,8 +28,8 @@ EPOCH                = 20
 # MAX_BUFFER_SIZE  = 4096 if not TEST_MODE else 256
 MAX_BUFFER_SIZE      = 4096    if not TEST_MODE else 256
 BATCH_SIZE           = 64
-EVALUATE_STEPS       = 10000  if not TEST_MODE else 50
-EVALUATE_TOTAL_STEPS = 10
+EVALUATE_TOTAL_STEPS = 2000   # 一轮评估的最大步长
+EVALUATE_STEPS       = 20000  if not TEST_MODE else 50
 TOTAL_STEPS          = 2000000 if not TEST_MODE else 9000
 
 
@@ -129,6 +130,7 @@ class PPOConfig:
     controller_config: ControllerConfig = field(default_factory=ControllerConfig)
     logger_config: LoggerConfig = field(default_factory=LoggerConfig)
 
+    method_name: str                 = METHOD_NAME
     n_process: int                   = N_PROCESS
     sample_steps: int                = MAX_BUFFER_SIZE   # 一次的采样长度
     total_steps: int                 = TOTAL_STEPS       # 总的期望采样长度
