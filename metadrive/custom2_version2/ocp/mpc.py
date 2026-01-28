@@ -57,8 +57,7 @@ class MPC(OCP):
         x0        = MX.sym('x0', self.config.nx)
         z_ref     = MX.sym('z_ref', 2 * (self.config.np + 1))
         u_prev    = MX.sym('u_prev', self.config.nu)
-        p         = MX.sym('p', 1)
-
+        
         Q  = DM(np.diag([5, 50])) # error
         R  = DM(np.diag([1, 1]))  # cost
         Rd = DM(np.diag([0, 0]))  # delta
