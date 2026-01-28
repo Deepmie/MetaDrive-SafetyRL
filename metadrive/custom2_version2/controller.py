@@ -1,7 +1,6 @@
 from metadrive.custom2_version2.ocp import MPC, CBF
 from metadrive.custom2_version2.ocp.config import MPConfig, CBFconfig
 from metadrive.custom2_version2.ocp.cbf_func import CBFunctions
-from metadrive.custom2_version2.ocp.performance_metric_func import PerformetricFunc
 from metadrive.custom2_version2.envs import ParallelEnv, SingleEnv
 from metadrive.custom2_version2.type import VehicleState
 from metadrive.custom2_version2.base_config import ControllerConfig
@@ -78,8 +77,7 @@ class Controller:
         self._num = self.config.n_process if not eval_mode else 1
         self.controller_result = ControllerResult(self.config, eval_mode=eval_mode)
         self._build_controller()
-        self.performetric_func: PerformetricFunc = PerformetricFunc(self.mpc_config)
-        self.performetrics: ndarray = self.mpc_config.p_0 * np.ones([self._num, 1], dtype=np.float32)
+        self.performetrics: ndarray = self.mpc_config.p_0 * np.ones([self._num, 2], dtype=np.float32)
 
     def control(self, actions: ndarray, dones: ndarray) -> Tuple[ControllerResult, Union[Dict]]:
         # 获得初始状态
@@ -90,33 +88,27 @@ class Controller:
 
         # ====== update if done include `True` ===== #
         self.controller_result.update_control_values_prev(dones)
+        dones_num: int = int(dones.sum().item())
+        if dones_num > 0:
+            dones_index = dones.flatten().astype(np.bool)
+            self.performetrics[dones_index] = self.mpc_config.p_0 * np.ones([dones_num, 2], dtype=np.float32)
         # ========================================== #
         
         for idx, (state, info, mask, ) in enumerate(zip(vehicle_states_init, infos, masks)):
             x0 = np.array([state.x, state.y, state.v, state.theta])
-            state_ref = actions[idx, 0: 2]
+            state_ref = actions[idx, 0: 2]; alpha = actions[idx, 2: 4]
             u_prev = self.controller_result.control_values_prev[idx, :]
-            # update performetrics
 
             # if not self.eval_mode and curr_step is not None:
             z_ref: ndarray = self.traj_generator.generate(state.theta, state_ref)
             assert isinstance(self.mpc_controller, MPC), 'Type of MPC mismatch!'
             u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev, self.performetrics[idx, 0: 1])
             u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
-            # ppc_reward, mpc_error = self._get_ppc_reward_error(z_ref, x_mpc, curr_step)
-            # ppc_reward, mpc_error = 0.0, 0.0
 
             if not bool(solve_info_mpc.get('success')):
                 raise Exception('MPC solve infeasible!')
             else:
                 self._check_solve_results(x0, x_mpc[0, :], 'mpc x')
-            
-            # elif self.eval_mode and curr_step is None:
-            #     assert isinstance(self.mpc_controller, MPCEval), 'Type of MPCEval mismatch!'
-            #     u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev)
-            #     u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
-            #     ppc_reward = 0.0; mpc_error = 0.0
-            #     self._check_solve_results(x0, x_mpc[0, :], 'mpc x')
             
             # 求解修正的控制量
             info, mask = self._filter_info_mask(np.array([state.x, state.y, state.theta]), info, mask, filter_num=self.config.filter_num)
@@ -138,6 +130,8 @@ class Controller:
             else:
                 extra_info = None
         
+        # update performance metrics
+        self.performetrics += self.mpc_config.p_inf * alpha.reshape(1, 2)
         return deepcopy(self.controller_result), extra_info
 
     def _build_controller(self):
@@ -226,12 +220,5 @@ class Controller:
             x[3] + x[2] / lr * np.sin(beta) * self.cbf_config.Ts,
         ])
         return x_next
-    
-    def _get_ppc_reward_error(self, z_ref: ndarray, x_mpc: ndarray, step: int) -> Tuple[ndarray, ndarray]:
-        z_mpc: ndarray = x_mpc[1, 2::]
-        error: ndarray = z_mpc - z_ref
-        zeta: float = self.performetric_func.error_transformation(error, step)
-        P: ndarray = np.array([[1, 1]])
-        return -self.config.ppc_coef * (P @ zeta), error
 
 

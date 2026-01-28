@@ -6,10 +6,10 @@ from numpy import ndarray
 from typing import Dict, Optional, Tuple
 from metadrive.custom2_version2.type import ActionType
 
-METHOD_NAME          = 'rl_mpc_cbf_traj'
+METHOD_NAME          = 'rl_mpc_cbf_ppc_traj'
 TEST_MODE            = False
 STATE_DIM            = 259
-ACTION_DIM           = 2
+ACTION_DIM           = 4
 TORCH_DTYPE          = torch.float32
 TORCH_DEVICE         = torch.device(device='cuda:0') if torch.cuda.is_available() else torch.device(device='cpu')
 # TORCH_DEVICE         = torch.device(device='cpu')
@@ -155,10 +155,6 @@ class PPOConfig:
     theta_max: float                 =  np.pi / 3
     alpha_min: float                 = 0.8
     alpha_max: float                 = 1.0
-    # p_inf_min: float                 = 0.1
-    # p_inf_max: float                 = 1.0
-    # lota_min: float                  = 0.01
-    # lota_max: float                  = 1.0
     
     update_freq: int                 = UPDATE_FREQ       # 经过多少步才更新
     target_kl: Optional[float]       = None
