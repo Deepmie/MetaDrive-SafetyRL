@@ -6,7 +6,7 @@ from numpy import ndarray
 from typing import Dict, Optional, Tuple
 from metadrive.custom2_version2.type import ActionType
 
-METHOD_NAME          = 'rl_mpc_cbf_ppc_traj'
+METHOD_NAME          = 'rl_mpc_cbf_ppc2_traj'
 TEST_MODE            = False
 STATE_DIM            = 259
 ACTION_DIM           = 4

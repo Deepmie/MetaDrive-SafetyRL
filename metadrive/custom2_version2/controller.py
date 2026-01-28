@@ -102,7 +102,7 @@ class Controller:
             # if not self.eval_mode and curr_step is not None:
             z_ref: ndarray = self.traj_generator.generate(state.theta, state_ref)
             assert isinstance(self.mpc_controller, MPC), 'Type of MPC mismatch!'
-            u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev, self.performetrics[idx, 0: 1])
+            u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev, self.performetrics[idx])
             u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
 
             if not bool(solve_info_mpc.get('success')):
