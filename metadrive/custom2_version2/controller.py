@@ -89,9 +89,6 @@ class Controller:
         # ====== update if done include `True` ===== #
         self.controller_result.update_control_values_prev(dones)
         dones_num: int = int(dones.sum().item())
-        if dones_num > 0:
-            dones_index = dones.flatten().astype(np.bool)
-            self.performetrics[dones_index] = self.mpc_config.p_0 * np.ones([dones_num, 2], dtype=np.float32)
         # ========================================== #
         
         for idx, (state, info, mask, ) in enumerate(zip(vehicle_states_init, infos, masks)):

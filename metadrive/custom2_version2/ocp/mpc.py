@@ -61,7 +61,6 @@ class MPC(OCP):
         Q  = DM(np.diag([5, 50])) # error
         R  = DM(np.diag([1, 1]))  # cost
         Rd = DM(np.diag([0, 0]))  # delta
-        P  = DM(np.array([[1, 1]]))  # ppc
         
         g = list()
         cost = 0
@@ -83,7 +82,7 @@ class MPC(OCP):
                     # (self.config.delta_L ** 2) * ca.log(ca.cosh(error_trans / self.config.delta_L))
                     # 1 / 2 * ca.log((error_trans + self.config.delta_L) / (self.config.delta_R - error_trans))
             cost += ca.mtimes([uk.T, R, uk])
-
+            
             # duk = uk - u_prev_sym
             # cost += ca.times([duk.T, Rd, duk])
 
@@ -98,7 +97,7 @@ class MPC(OCP):
             'x': ca.vertcat(U, X),
             'f': cost,
             'g': ca.vertcat(*g),
-            'p': ca.vertcat(x0, z_ref, u_prev, p)
+            'p': ca.vertcat(x0, z_ref, u_prev)
         }
 
         self._nlp_metadata = \
