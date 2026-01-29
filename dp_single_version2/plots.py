@@ -22,7 +22,7 @@ class Ploter:
         _ax = self._fig.add_subplot(1, 1, 1)
         self._plot_reward_group(_ax, [
             dict(reward_name='avg_reward', method_name='rl_mpc_cbf_traj'),
-            dict(reward_name='avg_reward', method_name='rl_mpc_cbf_ppc_traj'),
+            dict(reward_name='avg_reward', method_name='rl_mpc_cbf_ppc2_traj'),
         ])
 
         _ax.set_xlabel('step $s$'); _ax.set_ylabel('reward $r$')

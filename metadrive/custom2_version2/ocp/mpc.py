@@ -52,7 +52,7 @@ class MPC(OCP):
         # ------- 添加决策变量 ----- #
         U = MX.sym('U', self.config.nu * self.config.mu)
         X = MX.sym('X', self.config.nx * (self.config.np+1))
-
+        
         # -------- 添加常量 ------- #
         x0        = MX.sym('x0', self.config.nx)
         z_ref     = MX.sym('z_ref', 2 * (self.config.np + 1))
