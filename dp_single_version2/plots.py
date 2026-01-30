@@ -8,17 +8,19 @@ from typing import Tuple, List, Dict
 class Ploter:
     def __init__(self):
         self._path_root: str = 'dp_single_version2/figdata'
-        self._figsize: Tuple = (20, 6)
+
         self._set_init_config()
     
-    def plot(self, reward_name: str):
-        self._fig, self._ax = plt.subplots(figsize=self._figsize)
+    def plot(self, reward_name: str, figsize: Tuple):
+        self._fig, self._ax = plt.subplots(figsize=figsize)
         self._ax.axis('off')
 
         if reward_name == 'avg_reward':
             self._plot_reward_1()
         elif reward_name == 'eval_reward':
             self._plot_reward_2()
+        elif reward_name == 'physic_state':
+            self._plot_physic_state()
 
         self._fig.savefig(os.path.join(self._path_root, f'{reward_name}.png'))
 
@@ -45,6 +47,35 @@ class Ploter:
         _ax.set_xlabel('step $s$'); _ax.set_ylabel('reward $r$')
         _ax.set_title('EVAL REWARD')
         _ax.legend()
+
+    def _plot_physic_state(self):
+        method_infos: List[Dict] = [
+            dict(method_name='rl_mpc_cbf'),
+            dict(method_name='rl_mpc_cbf_traj'),
+            dict(method_name='rl_mpc_cbf_ppc2_traj'),
+        ]
+        _ax1 = self._fig.add_subplot(1, 3, 1)
+        _ax2 = self._fig.add_subplot(1, 3, 2)
+        _ax3 = self._fig.add_subplot(1, 3, 3)
+        for idx, info in enumerate(method_infos):
+            method_name: str = info['method_name']
+            data_path: str = os.path.join(self._path_root, method_name, 'phsical_state.txt')
+            data: ndarray = self._preprocess_physical_data(data_path)
+            _ax1.plot(data[:, 0: 1], data[:, 1: 2], label=str(info['method_name']))
+            _ax2.plot(data[:, 2: 3], label=str(info['method_name']))
+            _ax3.plot(data[:, 3: 4], label=str(info['method_name']))
+        
+        _ax1.set_xlabel('pos $x$'); _ax1.set_ylabel('pos $y$')
+        _ax1.set_title('VEHICLE POSITION')
+        _ax1.legend()
+
+        _ax2.set_xlabel('step $s$'); _ax2.set_ylabel('$v$')
+        _ax2.set_title('VEHICLE VELOCITY')
+        _ax2.legend()
+    
+        _ax3.set_xlabel('step $s$'); _ax3.set_ylabel('$\theta$')
+        _ax3.set_title('VEHICLE THETA')
+        _ax3.legend()
 
     def _plot_reward_avg_group(self, ax: Axes, data_infos: List[Dict]) -> List[ndarray]:
         N: int = float('inf')
@@ -106,6 +137,11 @@ class Ploter:
             data_processd[i] = sum(data[i: i+(W-1)])
         return data_processd
     
+    def _preprocess_physical_data(self, data_path: str) -> ndarray:
+        with open(data_path, mode='r', encoding='utf-8') as f:
+            data: str = np.array([[float(s) for s in d.strip().split(',')] for d in f.read().strip().split('\n') if d.strip()], dtype=np.float32)
+        return data
+    
     def _set_init_config(self):
         plt.rcParams.update({
             'text.usetex': True,
@@ -116,5 +152,6 @@ class Ploter:
 
 if __name__ == '__main__':
     ploter: Ploter = Ploter()
-    ploter.plot('avg_reward')
-    ploter.plot('eval_reward')
+    # ploter.plot('avg_reward')
+    # ploter.plot('eval_reward')
+    ploter.plot('physic_state', figsize=(16, 4))
