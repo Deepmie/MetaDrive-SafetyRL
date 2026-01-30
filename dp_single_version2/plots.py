@@ -54,9 +54,12 @@ class Ploter:
             dict(method_name='rl_mpc_cbf_traj'),
             dict(method_name='rl_mpc_cbf_ppc2_traj'),
         ]
-        _ax1 = self._fig.add_subplot(1, 3, 1)
-        _ax2 = self._fig.add_subplot(1, 3, 2)
-        _ax3 = self._fig.add_subplot(1, 3, 3)
+        _ax1 = self._fig.add_subplot(2, 3, 1)
+        _ax2 = self._fig.add_subplot(2, 3, 2)
+        _ax3 = self._fig.add_subplot(2, 3, 3)
+        _ax3 = self._fig.add_subplot(2, 3, 3)
+        _ax4 = self._fig.add_subplot(2, 3, 4)
+        _ax5 = self._fig.add_subplot(2, 3, 5)
         for idx, info in enumerate(method_infos):
             method_name: str = info['method_name']
             data_path: str = os.path.join(self._path_root, method_name, 'phsical_state.txt')
@@ -64,18 +67,14 @@ class Ploter:
             _ax1.plot(data[:, 0: 1], data[:, 1: 2], label=str(info['method_name']))
             _ax2.plot(data[:, 2: 3], label=str(info['method_name']))
             _ax3.plot(data[:, 3: 4], label=str(info['method_name']))
+            _ax4.plot(data[:, 4: 5], label=str(info['method_name']))
+            _ax5.plot(data[:, 5: 6], label=str(info['method_name']))
         
-        _ax1.set_xlabel('pos $x$'); _ax1.set_ylabel('pos $y$')
-        _ax1.set_title('VEHICLE POSITION')
-        _ax1.legend()
-
-        _ax2.set_xlabel('step $s$'); _ax2.set_ylabel('$v$')
-        _ax2.set_title('VEHICLE VELOCITY')
-        _ax2.legend()
-    
-        _ax3.set_xlabel('step $s$'); _ax3.set_ylabel('$\theta$')
-        _ax3.set_title('VEHICLE THETA')
-        _ax3.legend()
+        _ax1.set_xlabel('pos $x$'); _ax1.set_ylabel('pos $y$'); _ax1.set_title('POSITION');   _ax1.legend()
+        _ax2.set_xlabel('step $s$'); _ax2.set_ylabel('$v$'); _ax2.set_title('VELOCITY');   _ax2.legend()
+        _ax3.set_xlabel('step $s$'); _ax3.set_ylabel('$\theta$'); _ax3.set_title('THETA');      _ax3.legend()
+        _ax4.set_xlabel('step $s$'); _ax4.set_ylabel('$a$'); _ax4.set_title('ACCELERATE'); _ax4.legend()
+        _ax5.set_xlabel('step $s$'); _ax5.set_ylabel('$\delta$'); _ax5.set_title('DELTA');      _ax5.legend()
 
     def _plot_reward_avg_group(self, ax: Axes, data_infos: List[Dict]) -> List[ndarray]:
         N: int = float('inf')
