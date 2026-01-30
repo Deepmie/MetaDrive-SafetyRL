@@ -22,6 +22,6 @@ if __name__ == '__main__':
     N: int = len(extract_infos)
     for info in extract_infos:
         state: VehicleState = info['vehicle_state']
-        file_writted.write(f'{state.x},{state.y},{state.v},{state.theta}\n')
+        file_writted.write(f'{state.x},{state.y},{state.v},{state.theta},{state.a},{state.delta}\n')
         file_writted.flush()
     file_writted.close()
