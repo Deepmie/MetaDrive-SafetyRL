@@ -89,7 +89,7 @@ class PPO:
             
             if self.num_steps >= (evaluate_idx + 1) * self.config.evaluate_steps:
                 print('\nstart to evaluate & save...')
-                evaluate_reward = self._evaluate()
+                evaluate_reward, _ = self._evaluate()
                 if evaluate_reward > best_reward: self._save(evaluate_reward=evaluate_reward, ckp_pth=self.best_policy_checkpoint_pth); best_reward = evaluate_reward
                 self.logger.write_reward(evaluate_reward, best_reward=best_reward)
                 self.monitor.collect_evaluate_reward(evaluate_reward)
@@ -113,7 +113,7 @@ class PPO:
         return reward_eval, extract_infos, metadata
     
     def final_eval(self, evaluate_path: Optional[str] = None):
-        reward_eval = self._evaluate(True, evaluate_path)
+        reward_eval, _ = self._evaluate(True, evaluate_path)
         print(f'episode_reward {reward_eval}')
         print('gif generation is finished ...')
     
