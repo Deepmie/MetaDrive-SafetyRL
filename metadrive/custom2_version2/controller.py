@@ -135,6 +135,7 @@ class Controller:
             if self.eval_mode:
                 extra_info: Dict = self._get_extra_test_info(x0, info, state, u_cbf)
                 extra_info['success'] = bool(solve_info_cbf.get('success'))
+                extra_info['vehicle_state'] = vehicle_states_init[0]
             else:
                 extra_info = None
         
