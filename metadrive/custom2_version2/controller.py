@@ -73,7 +73,7 @@ class Controller:
         self.controller_result = ControllerResult(self.config, eval_mode=eval_mode)
         self._build_controller()
 
-    def control(self, actions: ndarray, dones: ndarray) -> Tuple[ControllerResult, Union[Dict]]:
+    def control(self, actions: ndarray, dones: ndarray) -> Tuple[ControllerResult, Optional[Dict]]:
         # 获得初始状态
         vehicle_states_init = self._get_vehicle_state()
         infos, masks        = self._get_all_vehicle_position()
@@ -115,7 +115,8 @@ class Controller:
             
             if self.eval_mode:
                 extra_info: Dict = self._get_extra_test_info(x0, info, state, u_cbf)
-                extra_info['success'] = bool(solve_info_cbf.get('success'))
+                extra_info['success'] = bool(solve_info_cbf.get('success') and solve_info_mpc.get('success'))
+                extra_info['vehicle_state'] = vehicle_states_init[0]
             else:
                 extra_info = None
         return deepcopy(self.controller_result), extra_info

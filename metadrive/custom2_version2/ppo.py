@@ -89,7 +89,7 @@ class PPO:
             
             if self.num_steps >= (evaluate_idx + 1) * self.config.evaluate_steps:
                 print('\nstart to evaluate & save...')
-                evaluate_reward = self._evaluate()
+                evaluate_reward, _ = self._evaluate()
                 if evaluate_reward > best_reward: self._save(evaluate_reward=evaluate_reward, ckp_pth=self.best_policy_checkpoint_pth); best_reward = evaluate_reward
                 self.logger.write_reward(evaluate_reward, best_reward=best_reward)
                 self.monitor.collect_evaluate_reward(evaluate_reward)
@@ -107,8 +107,13 @@ class PPO:
         #         self.close()
         return self._start_successful, start_info
     
+    def eval_with_checkpoint(self, ckpt_path: str) -> Tuple[float, Dict]:
+        metadata = self._load(ckpt_path)
+        reward_eval, extract_infos = self._evaluate(False)
+        return reward_eval, extract_infos, metadata
+    
     def final_eval(self, evaluate_path: Optional[str] = None):
-        reward_eval = self._evaluate(True, evaluate_path)
+        reward_eval, _ = self._evaluate(True, evaluate_path)
         print(f'episode_reward {reward_eval}')
         print('gif generation is finished ...')
     
@@ -125,9 +130,9 @@ class PPO:
     def load_weight_from_checkpoint(self, load_path: Optional[str] = None) -> Dict:
         if load_path is None:
             load_path = self.config.policy_checkpoint_pth
-        meatadata = self._load(load_path)
+        metadata = self._load(load_path)
         print(f'load weight from `{load_path}` successfully!')
-        return meatadata
+        return metadata
 
     def _sample(self):
         pbar = tqdm(total=self.config.sample_steps, desc='sample')
@@ -219,7 +224,7 @@ class PPO:
         self.policy.to(torch.device(device='cpu'))
         pbar.close()
 
-    def _evaluate(self, is_render: bool = False, evaluate_save_path: str = '') -> Tuple:
+    def _evaluate(self, is_render: bool = False, evaluate_save_path: str = '') -> Tuple[float, List]:
         self.policy.eval()
         # 创建一个新的环境
         env_eval: SingleEnv = SingleEnv(
@@ -233,6 +238,7 @@ class PPO:
 
         last_done = np.ones(shape=[1, ])
         total_reward = 0.0
+        extra_infos: List[Dict] = list()
         if is_render: render_row_text = self._create_render_text()
         
         for _ in range(self.config.evaluate_total_steps):
@@ -242,6 +248,7 @@ class PPO:
             obs, reward, done, step_info = env_eval.step(controller_result.get_control_values_modified())
             
             total_reward += reward
+            extra_infos.append(extra_info)
             if is_render: self.render_class.add_frame(self._render(render_row_text, env_eval))
             
             if done:
@@ -253,7 +260,7 @@ class PPO:
         # 清除用于评估的环境
         env_eval.close()
         del env_eval
-        return total_reward
+        return total_reward, extra_infos
     
     def _save(self, evaluate_reward: float, ckp_pth: str):
         # 保存checkpoint
