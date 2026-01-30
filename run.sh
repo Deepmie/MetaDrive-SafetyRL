@@ -13,10 +13,6 @@ case "$1" in
         echo "plot rewards..."
         python dp_single_version2/plots.py
     ;;
-    plotsims)
-        echo "plot rewards for simulator..."
-        python dp_single_version2/plot_sims.py
-    ;;
     eval)
         echo "evaluate policy from newest checkpoint..."
         CUDA_VISIBLE_DEVICES=1 python dp_single_version2/eval.py --type newest
