@@ -153,4 +153,4 @@ if __name__ == '__main__':
     ploter: Ploter = Ploter()
     # ploter.plot('avg_reward')
     # ploter.plot('eval_reward')
-    ploter.plot('physic_state', figsize=(16, 4))
+    ploter.plot('physic_state', figsize=(16, 8))
