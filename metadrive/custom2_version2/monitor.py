@@ -40,6 +40,7 @@ class Monitor:
     def _create_collector(self):
         self.avg_reward_collector = Collector(name='avg_reward', freq=10, path_root=self.dir_path)
         self.eval_reward_collector = Collector(name='eval_reward', freq=10, path_root=self.dir_path)
+        self.performetric_reward_collector = Collector(name='performetric', freq=10, path_root=self.dir_path)
     
 
 

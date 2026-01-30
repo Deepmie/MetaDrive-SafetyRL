@@ -24,7 +24,7 @@ class ControllerResult:
         self.state_values_modified   = np.empty([self._num, self.config.vehicle_state_dim])
         self.control_values          = np.empty([self._num, self.config.control_dim])
         self.control_values_modified = np.empty([self._num, self.config.control_dim])
-        self.performetrics           = np.empty([self._num, 1])
+        self.performetrics           = np.empty([self._num, 2])
     
     def push(self, x_mpc: ndarray, x_cbf: ndarray, u_mpc: ndarray, u_cbf: ndarray, performetric: ndarray):
         self.state_values[self._env_idx, :]             = x_mpc
@@ -122,7 +122,7 @@ class Controller:
                 # self._check_solve_results(u_mpc[0, :], u_cbf[0, :], 'cbf u')
             
             # 存入结果类中
-            self.controller_result.push(x_mpc[1, :], x_cbf[1, :], u_mpc[0, :], u_cbf[0, :], self.performetrics[idx, 0])
+            self.controller_result.push(x_mpc[1, :], x_cbf[1, :], u_mpc[0, :], u_cbf[0, :], self.performetrics[idx, :])
             
             if self.eval_mode:
                 extra_info: Dict = self._get_extra_test_info(x0, info, state, u_cbf)
