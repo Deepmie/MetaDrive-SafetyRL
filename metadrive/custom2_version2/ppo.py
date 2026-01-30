@@ -106,6 +106,11 @@ class PPO:
         #     if not self._start_successful:
         #         self.close()
         return self._start_successful, start_info
+
+    def eval_with_checkpoint(self, ckpt_path: str) -> Tuple[float, List, Dict]:
+        metadata = self._load(ckpt_path)
+        reward_eval, extract_infos = self._evaluate(False)
+        return reward_eval, extract_infos, metadata
     
     def final_eval(self, evaluate_path: Optional[str] = None):
         reward_eval = self._evaluate(True, evaluate_path)
@@ -219,7 +224,7 @@ class PPO:
         self.policy.to(torch.device(device='cpu'))
         pbar.close()
 
-    def _evaluate(self, is_render: bool = False, evaluate_save_path: str = '') -> Tuple:
+    def _evaluate(self, is_render: bool = False, evaluate_save_path: str = '') -> Tuple[float, List[Dict]]:
         self.policy.eval()
         # 创建一个新的环境
         env_eval: SingleEnv = SingleEnv(
@@ -233,6 +238,7 @@ class PPO:
 
         last_done = np.ones(shape=[1, ])
         total_reward = 0.0
+        extra_infos: List[Dict] = list()
         if is_render: render_row_text = self._create_render_text()
         
         for _ in range(self.config.evaluate_total_steps):
@@ -242,6 +248,7 @@ class PPO:
             obs, reward, done, step_info = env_eval.step(controller_result.get_control_values_modified())
             
             total_reward += reward
+            extra_infos.append(extra_info)
             if is_render: self.render_class.add_frame(self._render(render_row_text, env_eval))
             
             if done:
@@ -253,7 +260,7 @@ class PPO:
         # 清除用于评估的环境
         env_eval.close()
         del env_eval
-        return total_reward
+        return total_reward, extra_infos
     
     def _save(self, evaluate_reward: float, ckp_pth: str):
         # 保存checkpoint
