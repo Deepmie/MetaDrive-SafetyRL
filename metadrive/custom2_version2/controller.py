@@ -24,14 +24,12 @@ class ControllerResult:
         self.state_values_modified   = np.empty([self._num, self.config.vehicle_state_dim])
         self.control_values          = np.empty([self._num, self.config.control_dim])
         self.control_values_modified = np.empty([self._num, self.config.control_dim])
-        self.performetrics           = np.empty([self._num, 1])
     
-    def push(self, x_mpc: ndarray, x_cbf: ndarray, u_mpc: ndarray, u_cbf: ndarray, performetric: ndarray):
+    def push(self, x_mpc: ndarray, x_cbf: ndarray, u_mpc: ndarray, u_cbf: ndarray):
         self.state_values[self._env_idx, :]             = x_mpc
         self.state_values_modified[self._env_idx, :]    = x_cbf
         self.control_values[self._env_idx, :]           = u_mpc
         self.control_values_modified[self._env_idx, :]  = u_cbf
-        self.performetrics[self._env_idx, :]            = performetric
         self._env_idx += 1
 
     def update_control_values_prev(self, dones: ndarray):
@@ -63,9 +61,6 @@ class ControllerResult:
         if is_reverse: res = res[:, ::-1]
         if self.eval_mode: res = res.flatten()
         return res
-    
-    def get_performetrics(self) -> ndarray:
-        return self.performetrics
 
 
 
@@ -77,7 +72,6 @@ class Controller:
         self._num = self.config.n_process if not eval_mode else 1
         self.controller_result = ControllerResult(self.config, eval_mode=eval_mode)
         self._build_controller()
-        self.performetrics: ndarray = self.mpc_config.p_0 * np.ones([self._num, 2], dtype=np.float32)
 
     def control(self, actions: ndarray, dones: ndarray) -> Tuple[ControllerResult, Union[Dict]]:
         # 获得初始状态
@@ -88,18 +82,16 @@ class Controller:
 
         # ====== update if done include `True` ===== #
         self.controller_result.update_control_values_prev(dones)
-        dones_num: int = int(dones.sum().item())
         # ========================================== #
         
         for idx, (state, info, mask, ) in enumerate(zip(vehicle_states_init, infos, masks)):
             x0 = np.array([state.x, state.y, state.v, state.theta])
-            state_ref = actions[idx, 0: 2]; alpha = actions[idx, 2: 4]
+            state_ref = actions[idx, 0: 2]
             u_prev = self.controller_result.control_values_prev[idx, :]
 
             # if not self.eval_mode and curr_step is not None:
-            z_ref: ndarray = self.traj_generator.generate(state.theta, state_ref)
             assert isinstance(self.mpc_controller, MPC), 'Type of MPC mismatch!'
-            u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, z_ref, u_prev, self.performetrics[idx, 0: 1])
+            u_mpc, x_mpc, solve_info_mpc = self.mpc_controller(x0, state_ref, u_prev)
             u_mpc, x_mpc = cast(ndarray, u_mpc), cast(ndarray, x_mpc)
 
             if not bool(solve_info_mpc.get('success')):
@@ -119,16 +111,13 @@ class Controller:
                 # self._check_solve_results(u_mpc[0, :], u_cbf[0, :], 'cbf u')
             
             # 存入结果类中
-            self.controller_result.push(x_mpc[1, :], x_cbf[1, :], u_mpc[0, :], u_cbf[0, :], self.performetrics[idx, 0])
+            self.controller_result.push(x_mpc[1, :], x_cbf[1, :], u_mpc[0, :], u_cbf[0, :])
             
             if self.eval_mode:
                 extra_info: Dict = self._get_extra_test_info(x0, info, state, u_cbf)
                 extra_info['success'] = bool(solve_info_cbf.get('success'))
             else:
                 extra_info = None
-        
-        # update performance metrics
-        self.performetrics += self.mpc_config.p_inf * alpha.reshape(1, 2)
         return deepcopy(self.controller_result), extra_info
 
     def _build_controller(self):

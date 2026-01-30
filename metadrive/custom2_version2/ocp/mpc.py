@@ -19,14 +19,14 @@ class MPC(OCP):
         self.config: MPConfig = cast(MPConfig, self.config)
         self.performetric_func: PerformetricFuncCasadi = PerformetricFuncCasadi(self.config)
     
-    def __call__(self, x0, z_ref, u_prev, p) -> Tuple[ndarray, ndarray]:
+    def __call__(self, x0, z_ref, u_prev) -> Tuple[ndarray, ndarray]:
         '''
         x0: 当前车辆的状态: [横坐标x, 纵坐标y, 车辆速度v, 车辆角度theta],
         z_ref: 车辆的跟踪轨迹: [参考速度v_ref, 参考角度theta_ref],
         u_prev: 上一次的控制值: [加速度a_prev, 转向角delta_prev],
         curr_step: 当前所处的阶段: 一个标量
         '''
-        res: Dict = super(MPC, self).__call__(x0, z_ref, u_prev, p)
+        res: Dict = super(MPC, self).__call__(x0, z_ref, u_prev)
         return self._parse_result(res)
 
     def _build_numeric_problem(self):
@@ -55,7 +55,7 @@ class MPC(OCP):
 
         # -------- 添加常量 ------- #
         x0        = MX.sym('x0', self.config.nx)
-        z_ref     = MX.sym('z_ref', 2 * (self.config.np + 1))
+        z_ref     = MX.sym('z_ref', 2)
         u_prev    = MX.sym('u_prev', self.config.nu)
         
         Q  = DM(np.diag([5, 50])) # error
@@ -75,12 +75,9 @@ class MPC(OCP):
             xk_next = self._f(xk, uk); g.append(X[(k + 1) * self.config.nx: (k + 2) * self.config.nx] - xk_next)
             
             if k >= 1:
-                zk_e = xk[2::] - z_ref[k * 2: (k + 1) * 2]
+                zk_e = xk[2::] - z_ref
                 error_trans = ca.mtimes([zk_e.T, Q, zk_e])
                 cost += error_trans
-                    # ca.log(1 + (error_trans / self.config.delta_L) ** 2)
-                    # (self.config.delta_L ** 2) * ca.log(ca.cosh(error_trans / self.config.delta_L))
-                    # 1 / 2 * ca.log((error_trans + self.config.delta_L) / (self.config.delta_R - error_trans))
             cost += ca.mtimes([uk.T, R, uk])
             
             # duk = uk - u_prev_sym
@@ -89,7 +86,7 @@ class MPC(OCP):
             # update control varible #
             u_prev_sym = uk
         
-        zk_e_terminal = xk_next[2::] - z_ref[(self.config.np-1) * 2 : self.config.np * 2]
+        zk_e_terminal = xk_next[2::] - z_ref
         cost += ca.mtimes([zk_e_terminal.T, Q, zk_e_terminal])
         
         self._nlp = \

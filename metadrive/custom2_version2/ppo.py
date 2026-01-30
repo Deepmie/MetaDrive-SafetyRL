@@ -334,9 +334,6 @@ class PPO:
         new_actions = np.empty_like(actions)
         new_actions[:, 0] = self._renorm(clipped_actions[:, 0], self.config.v_max, self.config.v_min)
         new_actions[:, 1] = self._renorm(clipped_actions[:, 1], self.config.theta_max, self.config.theta_min)
-        
-        new_actions[:, 2] = self._renorm(clipped_actions[:, 2], self.config.alpha_max, self.config.alpha_min)
-        new_actions[:, 3] = self._renorm(clipped_actions[:, 3], self.config.alpha_max, self.config.alpha_min)
         return new_actions
     
     def _renorm(self, v: ndarray, v_max: float, v_min: float) -> ndarray: # 反归一化函数
