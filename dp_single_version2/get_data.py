@@ -4,7 +4,6 @@ from metadrive.custom2_version2.base_config import PPOConfig
 from metadrive.custom2_version2.ppo import PPO
 from metadrive.custom2_version2.utils import set_random_seed
 from metadrive.custom2_version2.type import VehicleState
-from metadrive.custom2_version2.utils.utils import get_logger_path
 from numpy import ndarray
 import numpy as np
 import os

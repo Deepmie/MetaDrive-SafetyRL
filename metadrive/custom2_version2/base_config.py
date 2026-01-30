@@ -7,7 +7,7 @@ from typing import Dict, Optional, Tuple
 from metadrive.custom2_version2.type import ActionType
 
 METHOD_NAME          = 'rl_mpc_cbf_ppc2_traj'
-TEST_MODE            = False
+TEST_MODE            = True
 STATE_DIM            = 259
 ACTION_DIM           = 4
 TORCH_DTYPE          = torch.float32
