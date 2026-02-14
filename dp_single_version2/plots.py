@@ -8,7 +8,6 @@ from typing import Tuple, List, Dict
 class Ploter:
     def __init__(self):
         self._path_root: str = 'dp_single_version2/figdata'
-
         self._set_init_config()
     
     def plot(self, reward_name: str, figsize: Tuple):
@@ -151,6 +150,6 @@ class Ploter:
 
 if __name__ == '__main__':
     ploter: Ploter = Ploter()
-    # ploter.plot('avg_reward')
-    # ploter.plot('eval_reward')
+    ploter.plot('avg_reward', figsize=(10, 6))
+    ploter.plot('eval_reward', figsize=(10, 6))
     ploter.plot('physic_state', figsize=(16, 10))
