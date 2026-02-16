@@ -6,9 +6,8 @@ import os
 from methods.common.collector import Collector
 
 class Monitor:
-    path_root: str = 'dp_single_version2/figdata'
-    def __init__(self, method_name: str):
-        self.method_name = method_name
+    def __init__(self, path_root: str, method_name: str):
+        self.path_root: str = path_root; self.method_name: str = method_name
         self._init_dir(); self._create_collector()
         self.accum_rewards: ndarray = np.zeros([4, ], dtype=np.float32)
         self.steps: ndarray = np.zeros([4, ], dtype=np.float32)
@@ -36,7 +35,7 @@ class Monitor:
         self.dir_path: str = os.path.join(self.path_root, self.method_name)
         if not os.path.exists(self.dir_path):
             os.mkdir(self.dir_path)
-
+    
     def _create_collector(self):
         self.avg_reward_collector = Collector(name='avg_reward', freq=10, path_root=self.dir_path)
         self.eval_reward_collector = Collector(name='eval_reward', freq=10, path_root=self.dir_path)

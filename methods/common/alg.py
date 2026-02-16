@@ -46,7 +46,7 @@ class DefaultAlg(BaseAlg):
         self.controller: DefaultController = self._create_controller(env=self.env, eval_mode=False)
         self.timer: Timer                  = Timer()
         self.render_class: RenderClass     = RenderClass()
-        self.monitor: Monitor              = Monitor(self.config.method_name)
+        self.monitor: Monitor              = Monitor(self.config.collect_data_path, self.config.method_name)
         
         self.schedule    = ConstantSchedule(self.config.epsilon)
 

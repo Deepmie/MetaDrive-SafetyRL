@@ -155,7 +155,7 @@ class BaseAlgConfig:
     theta_max: float                        =  np.pi / 3
     alpha_min: float                        = 0.8
     alpha_max: float                        = 1.0
-
+    
     update_freq: int                        = UPDATE_FREQ       # 经过多少步才更新
     target_kl: Optional[float]              = None
     evaluate_steps: int                     = EVALUATE_STEPS
@@ -164,8 +164,9 @@ class BaseAlgConfig:
     delta_bc: float                         = DELTA_BC
     policy_checkpoint_pth: str              = 'policy.pth'
     best_policy_checkpoint_pth: str         = 'policy_best.pth'
+    collect_data_path: str                  = 'deep/data/'
     device: torch.device                    = TORCH_DEVICE
-    _map: Set                              = field(default_factory=set)
+    _map: Set                               = field(default_factory=set)
 
     # 将名为attr_name的属性修改为attr_value
     def _set_special_attr(self, cls, attr_name: str, attr_value: Union[int, float, str]):
