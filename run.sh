@@ -3,27 +3,7 @@
 case "$1" in 
     train)
         echo "start to train..."
-        CUDA_VISIBLE_DEVICES=1 python dp_single_version2/main.py
-    ;;
-    check_env)
-        echo "check env..."
-        python metadrive/custom2_version2/create_env.py
-    ;;
-    plots)
-        echo "plot rewards..."
-        python dp_single_version2/plots.py
-    ;;
-    eval)
-        echo "evaluate policy from newest checkpoint..."
-        CUDA_VISIBLE_DEVICES=1 python dp_single_version2/eval.py --type newest
-    ;;
-    best_eval)
-        echo "evaluate best policy from checkpoint..."
-        CUDA_VISIBLE_DEVICES=1 python dp_single_version2/eval.py --type best
-    ;;
-    generate)
-        echo "generate code from project..."
-        python generate_code.py
+        PYTHONPATH=. CUDA_VISIBLE_DEVICES=1 python deep/main.py
     ;;
     github)
         git add .

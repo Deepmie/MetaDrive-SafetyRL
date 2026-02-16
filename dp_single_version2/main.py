@@ -1,8 +1,6 @@
-import sys
-sys.path.append('/workspace/metadrive-github/')
-from metadrive.custom2_version2.base_config import PPOConfig
-from metadrive.custom2_version2.ppo import PPO
-from metadrive.custom2_version2.utils import set_random_seed, get_logger_path
+from methods.common.base_config import PPOConfig
+from methods.common.ppo import PPO
+from methods.common.utils import set_random_seed, get_logger_path
 import os
 
 if __name__ == '__main__':
