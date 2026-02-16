@@ -8,7 +8,7 @@ from typing import Dict, List
 
 METHODS_LIST: List[str] = [
     # 'rl+mpc+cbf+ppc+traj',
-    # 'rl+mpc+cbf+traj',
+    # 'rl+mpc+cbf+traj',s
     'rl+mpc+cbf',
 ]
 
@@ -20,12 +20,12 @@ class Mainer:
         for method_name in METHODS_LIST:
             path_name: str = self._get_pathname_from_name(method_name) # 转换为pathname
             print(f'method: {method_name}, training...')
-            self._train_single_method(self._load_method(path_name), self._load_method_config(path_name))
+            self._train_single_method(method_name, self._load_method(path_name), self._load_method_config(path_name))
     
-    def _train_single_method(self, DefaultAlg_CLS: DefaultAlg, DefaultAlg_CONFIG_CLS: BaseAlgConfig):
+    def _train_single_method(self, method_name: str, DefaultAlg_CLS: DefaultAlg, DefaultAlg_CONFIG_CLS: BaseAlgConfig):
         alg_config: BaseAlgConfig = DefaultAlg_CONFIG_CLS()
         alg: DefaultAlg = DefaultAlg_CLS(alg_config)
-        logger_path: str = get_logger_path()
+        logger_path: str = get_logger_path(logger_path, method_name)
         is_suc, info = alg.start()
         
         if not is_suc:
@@ -36,7 +36,7 @@ class Mainer:
             alg.load_weight_from_checkpoint(os.path.join(logger_path, alg_config.best_policy_checkpoint_pth))
             alg.final_eval(os.path.join(logger_path, 'eval_best.gif'))
             alg.close()
-
+    
     def _eval_single_method(self, DefaultAlg_CLS: DefaultAlg, BaseAlg_CONFIG_CLS: BaseAlgConfig):
         alg_config: BaseAlgConfig = BaseAlg_CONFIG_CLS()
         alg: DefaultAlg = DefaultAlg_CLS(alg_config, eval_mode=True)
@@ -44,7 +44,7 @@ class Mainer:
     def _load_method(self, path_name: str) -> DefaultAlg:
         module: str = importlib.import_module(f'methods.{path_name}.alg')
         return getattr(module, 'Alg')
-
+    
     def _load_method_config(self, path_name: str) -> BaseAlgConfig:
         module: str = importlib.import_module(f'methods.{path_name}.base_config')
         return getattr(module, 'AlgConfig')
