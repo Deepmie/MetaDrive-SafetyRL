@@ -7,8 +7,8 @@ import json
 from typing import Dict, List
 
 METHODS_LIST: List[str] = [
-    # 'rl+mpc+cbf+ppc+traj',
-    # 'rl+mpc+cbf+traj',s
+    'rl+mpc+cbf+ppc+traj',
+    'rl+mpc+cbf+traj',
     'rl+mpc+cbf',
 ]
 
@@ -25,7 +25,7 @@ class Mainer:
     def _train_single_method(self, method_name: str, DefaultAlg_CLS: DefaultAlg, DefaultAlg_CONFIG_CLS: BaseAlgConfig):
         alg_config: BaseAlgConfig = DefaultAlg_CONFIG_CLS()
         alg: DefaultAlg = DefaultAlg_CLS(alg_config)
-        logger_path: str = get_logger_path(logger_path, method_name)
+        logger_path: str = get_logger_path(alg_config.logger_config.record_path, method_name)
         is_suc, info = alg.start()
         
         if not is_suc:
