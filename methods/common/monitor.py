@@ -6,8 +6,9 @@ import os
 from methods.common.collector import Collector
 
 class Monitor:
-    def __init__(self, path_root: str, method_name: str):
+    def __init__(self, path_root: str, method_name: str, eval_mode: bool):
         self.path_root: str = path_root; self.method_name: str = method_name
+        self.eval_mode = eval_mode
         self._init_dir(); self._create_collector()
         self.accum_rewards: ndarray = np.zeros([4, ], dtype=np.float32)
         self.steps: ndarray = np.zeros([4, ], dtype=np.float32)
@@ -37,9 +38,9 @@ class Monitor:
             os.mkdir(self.dir_path)
     
     def _create_collector(self):
-        self.avg_reward_collector = Collector(name='avg_reward', freq=10, path_root=self.dir_path)
-        self.eval_reward_collector = Collector(name='eval_reward', freq=10, path_root=self.dir_path)
-        self.performetric_reward_collector = Collector(name='performetric', freq=10, path_root=self.dir_path)
+        self.avg_reward_collector = Collector(name='avg_reward', freq=10, path_root=self.dir_path, eval_mode=self.eval_mode)
+        self.eval_reward_collector = Collector(name='eval_reward', freq=10, path_root=self.dir_path, eval_mode=self.eval_mode)
+        self.performetric_reward_collector = Collector(name='performetric', freq=10, path_root=self.dir_path, eval_mode=self.eval_mode)
     
 
 

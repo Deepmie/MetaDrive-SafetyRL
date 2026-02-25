@@ -3,13 +3,14 @@ import os
 import numpy as np
 
 class Collector:
-    def __init__(self, name: str, freq: int, path_root: str):
+    def __init__(self, name: str, freq: int, path_root: str, eval_mode: bool):
         self._path_root: str = path_root
         self._name: str = name; self._freq = freq
         self._tmp_file_path: str = os.path.join(self._path_root, f'{self._name}.tmp')
         self._file_path: str = os.path.join(self._path_root, f'{self._name}.txt')
         self._tmp_file = open(self._tmp_file_path, mode='w', encoding='utf-8')
         self._buffer: List[float] = list()
+        self.eval_mode = eval_mode
         self._idx: int = 0
 
     def collect_data(self, value: float):
@@ -28,7 +29,7 @@ class Collector:
         
     def close(self):
         self._write_in_file() # 把buffer中的条目全部写入
-        self._merge_result() # 修改.tmp为.txt
+        if not self.eval_mode: self._merge_result() # 修改.tmp为.txt
 
 
 if __name__ == '__main__':

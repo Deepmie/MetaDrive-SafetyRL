@@ -15,6 +15,8 @@ from methods.common.create_env import create_env, create_render_config
 from typing import Tuple, Dict, Union, Optional, List, cast
 from tqdm import tqdm
 from functools import partial
+from methods.common.type import VehicleState
+from methods.common.controller import DefaultController
 
 class Alg(DefaultAlg):
     def __init__(self, config: BaseAlgConfig, eval_mode: bool = False):
@@ -119,6 +121,9 @@ class Alg(DefaultAlg):
         )
         obs = env_eval.reset()
 
+        # 创建一个新的控制器
+        self.controller_eval: DefaultController = self._create_controller(env=env_eval, eval_mode=True)
+
         last_done = np.ones(shape=[1, ])
         total_reward = 0.0
         extra_infos: List[Dict] = list()
@@ -130,7 +135,7 @@ class Alg(DefaultAlg):
             obs, reward, done, step_info = env_eval.step(transed_action.reshape(-1))
             
             total_reward += reward
-            extra_infos.append({})
+            extra_infos.append(self._get_extra_info())
             if is_render: self.render_class.add_frame(self._render(render_row_text, env_eval))
             
             if done:
@@ -143,6 +148,10 @@ class Alg(DefaultAlg):
         env_eval.close()
         del env_eval
         return total_reward, extra_infos
+
+    def _get_extra_info(self) -> Dict:
+        vehicle_state: VehicleState = self.controller_eval._get_vehicle_state()[0]
+        return {'vehicle_state': vehicle_state}
 
     def _get_policy_loss(self, advantages: Tensor, ratio: Tensor, clip_range: float):
         standard_loss_1 = advantages * ratio

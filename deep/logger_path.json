@@ -1,6 +1,7 @@
 {
-  "rl+mpc+cbf+ppc+traj": "deep/logger/rl+mpc+cbf+ppc+traj/log_2026_02_16_18_07_39",
+  "rl+mpc+cbf+ppc+traj": "deep/logger/rl+mpc+cbf+ppc+traj/log_2026_02_17_02_08_58",
   "rl+mpc+cbf+traj": "deep/logger/rl+mpc+cbf+traj/log_2026_02_16_18_11_46",
   "rl+mpc+cbf": "deep/logger/rl+mpc+cbf/log_2026_02_16_18_16_33",
-  "rl+mpc": "deep/logger/rl+mpc/log_2026_02_17_02_07_59"
+  "rl+mpc": "deep/logger/rl+mpc/log_2026_02_17_19_24_36",
+  "rl": "deep/logger/rl/log_2026_02_19_00_17_47"
 }

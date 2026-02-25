@@ -1,6 +1,7 @@
 from methods.common.base_config import BaseAlgConfig
 from methods.common.alg import DefaultAlg
 from methods.common.utils import set_random_seed, get_logger_path
+from methods.common.type import VehicleState
 import os
 import shutil
 import importlib
@@ -11,9 +12,15 @@ METHODS_LIST: List[str] = [
     # 'rl+mpc+cbf+ppc+traj',
     # 'rl+mpc+cbf+traj',
     # 'rl+mpc+cbf',
-    # 'rl+mpc',
+    # 'rl_mpc',
     'rl',
 ]
+
+# METHODS_LIST: List[str] = [
+#     'rl_mpc_cbf_ppc_traj',
+#     'rl_mpc_cbf_traj',
+#     'rl_mpc_cbf',
+# ]
 
 class Mainer:
     checkpoint_root_path: str = 'deep/checkpoints/'
@@ -29,6 +36,8 @@ class Mainer:
     def evaluate(self):
         for method_name in METHODS_LIST:
             path_name: str = self._get_pathname_from_name(method_name) # 转换为pathname
+            print(f'method: {method_name}, evaluate...')
+            self._eval_single_method(method_name, path_name, self._load_method(path_name), self._load_method_config(path_name))
     
     def _train_single_method(self, method_name: str, path_name: str, DefaultAlg_CLS: DefaultAlg, BaseAlg_CONFIG_CLS: BaseAlgConfig):
         alg_config: BaseAlgConfig = BaseAlg_CONFIG_CLS()
@@ -52,7 +61,13 @@ class Mainer:
         alg: DefaultAlg = DefaultAlg_CLS(alg_config, eval_mode=True)
         best_policy_checkpoint_path: str = os.path.join(self.checkpoint_root_path, f'{path_name}.pth')
         if not os.path.exists(best_policy_checkpoint_path): return None # if path not exists, then break.
-        alg.load_weight_from_checkpoint(best_policy_checkpoint_path)
+        reward_eval, extract_infos, metadata = alg.eval_with_checkpoint(best_policy_checkpoint_path)
+        phsical_state_path: str = os.path.join(self.alg_config.collect_data_path, method_name, 'phsical_state.txt')
+        with open(phsical_state_path, mode='w', encoding='utf-8') as writer:
+            for info in extract_infos:
+                state: VehicleState = info['vehicle_state']
+                writer.write(f'{state.x},{state.y},{state.v},{state.theta},{state.a},{state.delta}\n')
+        alg.close()
     
     def _load_method(self, path_name: str) -> DefaultAlg:
         module: str = importlib.import_module(f'methods.{path_name}.alg')
@@ -71,9 +86,11 @@ class Mainer:
         set_random_seed(0) # set seed
         with open('methods/method_list.json', encoding='utf-8', mode='r') as f:
             self.methods: List[Dict] = json.loads(f.read())
+        self.alg_config: BaseAlgConfig = BaseAlgConfig()
 
 
 # main progress
 if __name__ == '__main__':
     mainer = Mainer()
     mainer() # run
+    # mainer.evaluate()

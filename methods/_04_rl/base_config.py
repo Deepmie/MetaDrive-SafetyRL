@@ -7,7 +7,7 @@ from typing import Dict, Optional, Tuple
 from methods.common.type import ActionType
 from methods.common.base_config import BaseAlgConfig
 
-METHOD_NAME          = 'rl+mpc'
+METHOD_NAME          = 'rl'
 
 @dataclass
 class AlgConfig(BaseAlgConfig):
