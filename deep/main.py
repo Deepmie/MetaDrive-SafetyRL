@@ -10,10 +10,11 @@ from typing import Dict, List
 
 METHODS_LIST: List[str] = [
     # 'rl+mpc+cbf+ppc+traj',
-    # 'rl+mpc+cbf+traj',
+    'rl+mpc+cbf+ppc',
+    'rl+mpc+cbf+traj',
     # 'rl+mpc+cbf',
     # 'rl_mpc',
-    'rl',
+    # 'rl',
 ]
 
 # METHODS_LIST: List[str] = [

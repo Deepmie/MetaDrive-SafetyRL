@@ -1,6 +1,6 @@
 from methods.common.alg import DefaultAlg
-from methods._00_rl_mpc_cbf_ppc_traj.controller import Controller
-from methods._00_rl_mpc_cbf_ppc_traj.mpc import MPC
+from methods._00al01_rl_mpc_cbf_ppc.controller import Controller
+from methods._00al01_rl_mpc_cbf_ppc.mpc import MPC
 from methods.common.ocp import DefaultCBF
 from methods.common.envs import SingleEnv, ParallelEnv
 from numpy import ndarray

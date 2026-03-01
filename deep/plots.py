@@ -9,6 +9,7 @@ from itertools import accumulate
 METHODS_LIST: List[str] = [
     'rl_mpc_cbf_ppc_traj',
     'rl_mpc_cbf_traj',
+    'rl_mpc_cbf_ppc',
     'rl_mpc_cbf',
     'rl_mpc',
     'rl'

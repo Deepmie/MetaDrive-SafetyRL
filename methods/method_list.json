@@ -1,13 +1,8 @@
 [
     {"index": 0, "method_name": "rl+mpc+cbf+ppc+traj", "file_name": "_00_rl_mpc_cbf_ppc_traj"},
-    {"index": 1, "method_name": "rl+mpc+cbf+traj"    , "file_name": "_01_rl_mpc_cbf_traj"},
-    {"index": 2, "method_name": "rl+mpc+cbf"         , "file_name": "_02_rl_mpc_cbf"},
-    {"index": 3, "method_name": "rl+mpc"             , "file_name": "_03_rl_mpc"},
-    {"index": 4, "method_name": "rl"                 , "file_name": "_04_rl"},
-
-    {"index": 0, "method_name": "rl_mpc_cbf_ppc_traj", "file_name": "_00_rl_mpc_cbf_ppc_traj"},
-    {"index": 1, "method_name": "rl_mpc_cbf_traj"    , "file_name": "_01_rl_mpc_cbf_traj"},
-    {"index": 2, "method_name": "rl_mpc_cbf"         , "file_name": "_02_rl_mpc_cbf"},
-    {"index": 3, "method_name": "rl_mpc"             , "file_name": "_03_rl_mpc"},
-    {"index": 4, "method_name": "rl"                 , "file_name": "_04_rl"}
+    {"index": 1, "method_name": "rl+mpc+cbf+ppc"     , "file_name": "_00al01_rl_mpc_cbf_ppc"},
+    {"index": 2, "method_name": "rl+mpc+cbf+traj"    , "file_name": "_00al02_rl_mpc_cbf_traj"},
+    {"index": 3, "method_name": "rl+mpc+cbf"         , "file_name": "_01bc00_rl_mpc_cbf"},
+    {"index": 5, "method_name": "rl"                 , "file_name": "_01bc01_rl"},
+    {"index": 4, "method_name": "rl+mpc"             , "file_name": "_02util01_rl_mpc"}
 ]

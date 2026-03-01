@@ -2,7 +2,7 @@ from methods.common.envs import ParallelEnv, SingleEnv
 from methods.common.base_config import ControllerConfig
 from methods.common.controller import DefaultController, DefaultControllerResult
 from methods.common.ocp import DefaultCBF
-from methods._00_rl_mpc_cbf_ppc_traj.mpc import MPC
+from methods._00al01_rl_mpc_cbf_ppc.mpc import MPC
 from typing import Dict, Tuple, Union, Optional, cast
 import numpy as np
 from numpy import ndarray

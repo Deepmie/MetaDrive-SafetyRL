@@ -9,11 +9,12 @@ from common import set_init_config
 
 PATH_ROOT = 'deep/data/'
 INFOS = [
-    dict(method_name='rl_mpc_cbf_ppc_traj', style=dict(linewidth=1.5, zorder=99, color='#0868ac')),
-    dict(method_name='rl_mpc_cbf_traj'    , style=dict(linewidth=1  , zorder=98, color='#43a2ca')),
-    dict(method_name='rl_mpc_cbf'         , style=dict(linewidth=1  , zorder=97, color='#7bccc4')),
-    dict(method_name='rl_mpc'             , style=dict(linewidth=1  , zorder=96, color='#bae4bc')),
-    dict(method_name='rl'                 , style=dict(linewidth=1  , zorder=95, color="#ecfedd")),
+    dict(method_name='rl_mpc_cbf_ppc_traj', style=dict(linewidth=1.5, zorder=99, )), #color='#0868ac')),
+    # dict(method_name='rl_mpc_cbf_traj'    , style=dict(linewidth=1  , zorder=98, )), #color='#43a2ca')),
+    dict(method_name='rl_mpc_cbf_ppc'     , style=dict(linewidth=1  , zorder=97, )), #color="#ca6343")),
+    dict(method_name='rl_mpc_cbf'         , style=dict(linewidth=1  , zorder=96, )), #color='#7bccc4')),
+    # dict(method_name='rl_mpc'             , style=dict(linewidth=1  , zorder=95, )), #color='#bae4bc')),
+    # dict(method_name='rl'                 , style=dict(linewidth=1  , zorder=94, )), #color="#ecfedd")),
 ]
 
 def get_plot_data(file_name: str, method_name: str) -> ndarray:
@@ -34,7 +35,7 @@ def main():
     fig, ax = plt.subplots(figsize=(10, 4))
 
     N: int = float('inf')
-    init_index: int = 4000
+    init_index: int = 0
     slice_func = lambda x, N: x[init_index: N]
     datas: List[ndarray] = list()
     # get data

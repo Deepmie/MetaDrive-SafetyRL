@@ -7,7 +7,7 @@ from typing import Dict, Optional, Tuple, Union
 from methods.common.type import ActionType
 from methods.common.base_config import BaseAlgConfig
 
-METHOD_NAME          = 'rl+mpc+cbf+ppc+traj'
+METHOD_NAME          = 'rl+mpc+cbf+ppc'
 ACTION_DIM           = 4
 
 @dataclass
